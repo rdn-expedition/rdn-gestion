@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#244b35">
+<title>RDN GESTION</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="login" class="login">
+  <div class="login-card"><div class="brand">RDN <span>GESTION</span></div>
+  <p>Gestion administrative et financière de RDN Expédition</p>
+  <label>Email administrateur</label><input id="email" type="email" autocomplete="username" placeholder="admin@email.com">
+  <label>Mot de passe</label><input id="password" type="password" autocomplete="current-password" placeholder="Mot de passe">
+  <button id="loginBtn">Se connecter</button><p id="loginMsg" class="msg"></p>
+  <small>Connexion sécurisée Firebase</small></div>
+</div>
+<div id="app" class="hidden">
+<header><div><b>RDN GESTION</b><small>Randonnée • Découverte • Nature</small></div><button id="logoutBtn" class="light">Déconnexion</button></header>
+<nav id="nav">
+<button data-page="dashboard" class="active">Tableau de bord</button>
+<button data-page="clients">Clients</button><button data-page="excursions">Excursions</button>
+<button data-page="reservations">Réservations</button><button data-page="factures">Factures</button>
+<button data-page="depenses">Dépenses</button>
+</nav>
+<main><section id="dashboard" class="page"><h1>Tableau de bord</h1>
+<div class="stats"><article><small>Clients</small><strong id="nClients">0</strong></article><article><small>Excursions</small><strong id="nExcursions">0</strong></article><article><small>Réservations</small><strong id="nReservations">0</strong></article><article><small>Dépenses (Ar)</small><strong id="sumDepenses">0</strong></article></div>
+<div class="panel"><h2>Bienvenue dans RDN GESTION</h2><p>Choisissez un module pour gérer votre activité. Les données sont synchronisées avec Firebase lorsque la configuration est complétée.</p></div></section>
+<section id="clients" class="page hidden"><h1>Clients</h1><form data-kind="clients"><input name="nom" required placeholder="Nom complet"><input name="telephone" placeholder="Téléphone"><input name="email" type="email" placeholder="Email"><button>Ajouter un client</button></form><div id="list-clients"></div></section>
+<section id="excursions" class="page hidden"><h1>Excursions</h1><form data-kind="excursions"><input name="titre" required placeholder="Nom de l'excursion"><input name="date" placeholder="Date (ex. 21/11/2026)"><input name="prix" type="number" min="0" placeholder="Prix (Ar)"><input name="places" type="number" min="0" placeholder="Nombre de places"><button>Ajouter l'excursion</button></form><div id="list-excursions"></div></section>
+<section id="reservations" class="page hidden"><h1>Réservations</h1><form data-kind="reservations"><input name="client" required placeholder="Nom du client"><input name="excursion" required placeholder="Excursion"><input name="personnes" type="number" min="1" value="1" placeholder="Personnes"><input name="acompte" type="number" min="0" placeholder="Acompte (Ar)"><select name="statut"><option>En attente</option><option>Confirmée</option><option>Annulée</option></select><button>Ajouter la réservation</button></form><div id="list-reservations"></div></section>
+<section id="factures" class="page hidden"><h1>Factures</h1><form data-kind="factures"><input name="numero" required placeholder="N° facture"><input name="client" required placeholder="Client"><input name="objet" placeholder="Objet"><input name="montant" type="number" min="0" placeholder="Montant (Ar)"><button>Enregistrer la facture</button></form><div id="list-factures"></div></section>
+<section id="depenses" class="page hidden"><h1>Dépenses</h1><form data-kind="depenses"><input name="libelle" required placeholder="Libellé"><input name="categorie" placeholder="Catégorie"><input name="montant" type="number" min="0" required placeholder="Montant (Ar)"><input name="date" placeholder="Date"><button>Ajouter la dépense</button></form><div id="list-depenses"></div></section>
+</main><footer>RDN Expédition — Izay mandeha mahita</footer>
+</div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script><script src="app.js"></script>
+</body></html>
