@@ -168,6 +168,7 @@ async function load(kind) {
 }
 
 // Tableau de bord
+
 async function refreshStats() {
   if (!db) return;
 
@@ -183,23 +184,36 @@ async function refreshStats() {
       $(id).textContent = s.numChildren();
     }
 
-    // Calcul de toutes les dépenses
+    // Maka ny dépenses rehetra ao Firebase
     const snap = await db.ref("rdn/depenses").once("value");
 
     let total = 0;
 
     snap.forEach(item => {
-      const depense = item.val();
-      total += parseMontant(depense.montant);
+      const d = item.val();
+
+      if (d && d.montant !== undefined) {
+        let montant = String(d.montant)
+          .replace(/\s/g, "")
+          .replace(/Ar/gi, "")
+          .replace(/,/g, ".")
+          .replace(/[^\d.-]/g, "");
+
+        total += Number(montant) || 0;
+      }
     });
 
     $("sumDepenses").textContent =
       total.toLocaleString("fr-FR") + " Ar";
 
+    console.log("Nombre dépenses :", snap.numChildren());
+    console.log("Total dépenses :", total);
+
   } catch (e) {
     console.error("Erreur actualisation tableau de bord :", e);
   }
 }
+
 
 // Lancement
 init();
