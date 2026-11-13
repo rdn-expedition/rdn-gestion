@@ -22,47 +22,29 @@
 <button data-page="reservations">Réservations</button><button data-page="factures">Factures</button>
 <button data-page="depenses">Dépenses</button>
 </nav>
-<main>
-<section id="dashboard" class="page"><h1>Tableau de bord</h1>
-<div class="stats">
-<article><small>Clients</small><strong id="nClients">0</strong></article>
-<article><small>Excursions</small><strong id="nExcursions">0</strong></article>
-<article><small>Réservations</small><strong id="nReservations">0</strong></article>
-<article><small>Dépenses (Ar)</small><strong id="sumDepenses">0</strong></article>
-<article><small>Facturé (Ar)</small><strong id="sumFactures">0</strong></article>
-<article><small>Reste à encaisser (Ar)</small><strong id="sumImpayes">0</strong></article>
-</div>
+<main><section id="dashboard" class="page"><h1>Tableau de bord</h1>
+<div class="stats"><article><small>Clients</small><strong id="nClients">0</strong></article><article><small>Excursions</small><strong id="nExcursions">0</strong></article><article><small>Réservations</small><strong id="nReservations">0</strong></article><article><small>Dépenses (Ar)</small><strong id="sumDepenses">0</strong></article></div>
 <div class="panel"><h2>Bienvenue dans RDN GESTION</h2><p>Choisissez un module pour gérer votre activité. Les données sont synchronisées avec Firebase lorsque la configuration est complétée.</p></div></section>
 <section id="clients" class="page hidden"><h1>Clients</h1><form data-kind="clients"><input name="nom" required placeholder="Nom complet"><input name="telephone" placeholder="Téléphone"><input name="email" type="email" placeholder="Email"><button>Ajouter un client</button></form><div id="list-clients"></div></section>
 <section id="excursions" class="page hidden"><h1>Excursions</h1><form data-kind="excursions"><input name="titre" required placeholder="Nom de l'excursion"><input name="date" placeholder="Date (ex. 21/11/2026)"><input name="prix" type="number" min="0" placeholder="Prix (Ar)"><input name="places" type="number" min="0" placeholder="Nombre de places"><button>Ajouter l'excursion</button></form><div id="list-excursions"></div></section>
 <section id="reservations" class="page hidden"><h1>Réservations</h1><form data-kind="reservations"><input name="client" required placeholder="Nom du client"><input name="excursion" required placeholder="Excursion"><input name="personnes" type="number" min="1" value="1" placeholder="Personnes"><input name="acompte" type="number" min="0" placeholder="Acompte (Ar)"><select name="statut"><option>En attente</option><option>Confirmée</option><option>Annulée</option></select><button>Ajouter la réservation</button></form><div id="list-reservations"></div></section>
-<section id="factures" class="page hidden">
-<h1>Factures</h1>
-<div class="invoice-intro">Créez une facture d’acompte au format RDN Expédition, puis imprimez-la ou enregistrez-la en PDF.</div>
+<section id="factures" class="page hidden"><h1>Factures</h1>
+<div class="invoice-intro">Facture d’acompte RDN Expédition — numéro automatique, suivi du paiement et impression PDF.</div>
 <form id="invoiceForm" class="invoice-form">
-  <div class="form-heading">Informations du client</div>
-  <input name="client" required placeholder="Nom du client">
-  <input name="telephone" placeholder="Téléphone">
-  <input name="adresse" placeholder="Adresse">
-  <div class="form-heading">Détails du voyage</div>
-  <input name="objet" required placeholder="Détails des services / excursion">
-  <input name="dateVoyage" placeholder="Date du voyage (ex. 21/11/2026)">
-  <input name="personnes" type="number" min="1" value="1" required placeholder="Effectif (personnes)">
-  <input name="montant" type="number" min="0" required placeholder="Montant total (Ar)">
-  <input name="acompte" type="number" min="0" value="0" placeholder="Acompte payé (Ar)">
-  <select name="modePaiement"><option value="">Mode de paiement</option><option>Espèces</option><option>Mobile Money</option><option>Virement bancaire</option><option>Carte bancaire</option></select>
-  <input name="echeance" placeholder="Date d’échéance (ex. 21/11/2026)">
-  <textarea name="inclus" rows="3" placeholder="Inclus (un élément par ligne)">Transport aller-retour
+<div class="invoice-heading">Informations du client</div>
+<input name="client" required placeholder="Nom du client"><input name="telephone" placeholder="Téléphone"><input name="adresse" placeholder="Adresse">
+<div class="invoice-heading">Détails du voyage</div>
+<input name="objet" required placeholder="Détails des services / excursion"><input name="dateVoyage" placeholder="Date du voyage (ex. 21/11/2026)"><input name="personnes" type="number" min="1" value="1" required placeholder="Effectif (personnes)">
+<input name="montant" type="number" min="1" required placeholder="Montant total (Ar)"><input name="acompte" type="number" min="0" value="0" placeholder="Acompte payé (Ar)">
+<select name="modePaiement"><option value="">Mode de paiement</option><option>Espèces</option><option>Mobile Money</option><option>Virement bancaire</option><option>Carte bancaire</option></select><input name="echeance" placeholder="Date d’échéance">
+<textarea name="inclus" rows="3" placeholder="Inclus (un élément par ligne)">Transport aller-retour
 Tickets d'entrée
 Guidage
 Shooting photo</textarea>
-  <textarea name="note" rows="3" placeholder="Note / conditions particulières">Tsisy misy famerenam-bola raha toa ka misy ny tsy fahafahana tampoka (Aucun remboursement en cas d'empêchement de dernière minute).</textarea>
-  <div class="invoice-total-preview"><span>Numéro attribué automatiquement</span><strong id="nextInvoiceNumber">FA-2026-001</strong><small>Le numéro définitif est sécurisé lors de l’enregistrement.</small></div>
-  <button type="submit" class="save-invoice">Enregistrer la facture</button>
-</form>
-<div class="section-subtitle">Historique des factures</div>
-<div id="list-factures"></div>
-</section>
+<textarea name="note" rows="3" placeholder="Note / conditions particulières">Tsisy misy famerenam-bola raha toa ka misy ny tsy fahafahana tampoka (Aucun remboursement en cas d'empêchement de dernière minute).</textarea>
+<div class="invoice-number-preview">Numéro automatique : <strong id="invoiceNumberPreview">Attribué à l’enregistrement</strong></div>
+<button type="submit" class="invoice-save">Enregistrer et générer la facture</button></form>
+<h2 class="invoice-list-title">Historique des factures</h2><div id="list-factures"></div></section>
 <section id="depenses" class="page hidden"><h1>Dépenses</h1><form data-kind="depenses"><input name="libelle" required placeholder="Libellé"><input name="categorie" placeholder="Catégorie"><input name="montant" type="number" min="0" required placeholder="Montant (Ar)"><input name="date" placeholder="Date"><button>Ajouter la dépense</button></form><div id="list-depenses"></div></section>
 </main><footer>RDN Expédition — Izay mandeha mahita</footer>
 </div>
