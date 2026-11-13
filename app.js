@@ -692,8 +692,8 @@ body{
 <section class="bottom">
 
   <div class="contacts">
-    🔵 Facebook : RDN Expédition<br>
-    🟢 WhatsApp : 034 70 249 97
+    Facebook : RDN Expédition<br>
+    WhatsApp : 034 70 249 97
   </div>
 
   <div class="seal-sign">
