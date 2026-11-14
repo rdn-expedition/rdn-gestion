@@ -113,6 +113,8 @@
   </form>
 
   <div id="list-excursions"></div>
+  <h2 class="trip-balance-heading">Bilan prévisionnel par voyage</h2>
+  <div id="tripBalances" class="trip-balances"></div>
 </section>
 
 <section id="reservations" class="page hidden">
@@ -241,9 +243,17 @@ Shooting photo</textarea>
     <input name="libelle" required placeholder="Libellé">
     <input name="categorie" placeholder="Catégorie">
     <input name="montant" type="number" min="0" required placeholder="Montant (Ar)">
-    <input name="date" placeholder="Date">
+    <input name="date" type="date" aria-label="Date de la dépense">
+    <select name="typeDepense" id="typeDepense">
+      <option value="generale">Dépense générale</option>
+      <option value="voyage">Dépense par voyage</option>
+    </select>
+    <div id="expenseExcursionWrap" class="expense-trip-field hidden">
+      <select name="excursionId"><option value="">Choisir l'excursion concernée</option></select>
+    </div>
     <button>Ajouter la dépense</button>
   </form>
+  <p class="form-hint">Les anciennes dépenses sont conservées et restent incluses dans le total du tableau de bord.</p>
 
   <div id="list-depenses"></div>
 </section>
