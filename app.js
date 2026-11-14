@@ -763,22 +763,30 @@ body{
   padding:0;
   line-height:1.15;
 }
+
+.thanks{
+  font-style:italic;
+  color:#111;
+  margin:-18px 9px 0;
+  padding:0;
+  font-size:13px;
+  line-height:1.2;
+  position:relative;
+  z-index:1;
+}
+
 .seal-sign{
-  display:flex;
-  align-items:flex-start;
-  justify-content:flex-end
+  position:relative;
+  display:block;
 }
 
 .stamp-block{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:flex-start;
+  position:absolute;
+  right:0;
+  bottom:0;
+  z-index:5;
   max-width:165px;
-  margin-top:-45px;
-  margin-right:0;
-  position:relative;
-  z-index:2;
+  margin:0;
 }
 
 .stamp{
@@ -787,16 +795,6 @@ body{
   max-width:100%;
   object-fit:contain;
   display:block;
-}
-
-.thanks{
-  font-style:italic;
-  color:#111;
-  margin:-12px 9px 0;
-  font-size:13px;
-  line-height:1.2;
-  position:relative;
-  z-index:1;
 }
 
 .footer{
