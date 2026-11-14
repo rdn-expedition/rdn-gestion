@@ -36,6 +36,7 @@
   <div>
     <b>RDN GESTION</b>
     <small>Randonnée • Découverte • Nature</small>
+    <small id="syncStatus" class="sync-status">Connexion...</small>
     <small id="syncStatus" class="sync-status">Connexion en cours…</small>
   </div>
   <button id="logoutBtn" class="light">Déconnexion</button>
@@ -118,8 +119,8 @@
   <h1>Réservations</h1>
 
   <form data-kind="reservations">
-    <input name="client" required placeholder="Nom du client">
-    <input name="excursion" required placeholder="Excursion">
+    <select name="clientId" required><option value="">Choisir un client</option></select>
+    <select name="excursionId" required><option value="">Choisir une excursion</option></select>
     <input name="personnes" type="number" min="1" value="1" placeholder="Personnes">
     <input name="acompte" type="number" min="0" placeholder="Acompte (Ar)">
 
