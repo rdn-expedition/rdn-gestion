@@ -378,6 +378,7 @@ function formatDateRDN(value) {
 
 // ===== VÉRIFICATION DATE =====
 
+
 function verifierDateFactureRDN(input, titre) {
   if (!input || !input.value) {
     alert(titre + " obligatoire.");
@@ -386,20 +387,26 @@ function verifierDateFactureRDN(input, titre) {
   }
 
   const valeur = input.value;
+  const parts = valeur.split("-");
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(valeur)) {
-    alert("Format de date invalide pour : " + titre);
+  if (parts.length !== 3) {
+    alert("Date invalide : " + titre);
     input.focus();
     return false;
   }
 
-  const date = new Date(valeur + "T00:00:00");
+  const annee = Number(parts[0]);
+  const mois = Number(parts[1]);
+  const jour = Number(parts[2]);
+
+  const date = new Date(annee, mois - 1, jour);
 
   if (
-    Number.isNaN(date.getTime()) ||
-    date.toISOString().slice(0, 10) !== valeur
+    date.getFullYear() !== annee ||
+    date.getMonth() !== mois - 1 ||
+    date.getDate() !== jour
   ) {
-    alert("La date saisie est invalide : " + titre);
+    alert("Date invalide : " + titre);
     input.focus();
     return false;
   }
@@ -412,6 +419,7 @@ function verifierDateFactureRDN(input, titre) {
 
   return true;
 }
+
 
 // ===== CONFIGURATION DES CHAMPS DATE =====
 
