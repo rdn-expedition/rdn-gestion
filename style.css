@@ -11,3 +11,11 @@
 .record-edit{background:#315f46!important;color:#fff!important}
 .record-invoice{margin-top:8px;background:#176b9a!important;color:#fff!important}
 .item{display:block}.item>span,.item>small{display:block}
+
+.form-hint {
+  display: block;
+  margin: -4px 0 10px;
+  color: #68766d;
+  font-size: 12px;
+  line-height: 1.4;
+}
