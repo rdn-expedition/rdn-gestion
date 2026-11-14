@@ -775,23 +775,19 @@ body{
   align-items:center;
   justify-content:flex-start;
   max-width:165px;
-  transform:translateY(-12px)
-}
-
-.stamp{
-  width:145px;
-  height:145px;
-  max-width:100%;
-  object-fit:contain;
-  display:block
+  margin-top:-45px;
+  position:relative;
+  z-index:2;
 }
 
 .thanks{
   font-style:italic;
   color:#111;
-  margin:0 9px 7px;
+  margin:-12px 9px 0;
   font-size:13px;
-  line-height:1.35
+  line-height:1.2;
+  position:relative;
+  z-index:1;
 }
 
 .footer{
