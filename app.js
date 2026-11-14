@@ -783,7 +783,7 @@ body{
 .stamp-block{
   position:absolute;
   right:0;
-  top:10px;
+  top:3px;
   z-index:5;
   max-width:165px;
   margin:0;
