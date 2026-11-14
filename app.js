@@ -776,8 +776,17 @@ body{
   justify-content:flex-start;
   max-width:165px;
   margin-top:-45px;
+  margin-right:0;
   position:relative;
   z-index:2;
+}
+
+.stamp{
+  width:145px;
+  height:145px;
+  max-width:100%;
+  object-fit:contain;
+  display:block;
 }
 
 .thanks{
