@@ -19,7 +19,8 @@ const labels = {
   depenses: ["libelle", "categorie", "montant", "date"]
 };
 
-// Configuration Firebase
+// ===== CONFIGURATION FIREBASE =====
+
 function configured() {
   return firebaseConfig.apiKey &&
     !firebaseConfig.apiKey.startsWith("VOTRE_") &&
@@ -27,14 +28,14 @@ function configured() {
     !firebaseConfig.appId.startsWith("VOTRE_");
 }
 
-// Conversion montant en nombre
 function parseMontant(value) {
   if (value === null || value === undefined) return 0;
   const montant = String(value).replace(/[^\d-]/g, "");
   return Number(montant) || 0;
 }
 
-// Initialisation
+// ===== INITIALISATION =====
+
 function init() {
   if (!configured()) {
     $("loginMsg").textContent =
@@ -60,7 +61,8 @@ function init() {
   });
 }
 
-// Connexion
+// ===== CONNEXION =====
+
 $("loginBtn").onclick = async () => {
   try {
     await auth.signInWithEmailAndPassword(
@@ -72,10 +74,10 @@ $("loginBtn").onclick = async () => {
   }
 };
 
-// Déconnexion
 $("logoutBtn").onclick = () => auth.signOut();
 
-// Navigation
+// ===== NAVIGATION =====
+
 document.querySelectorAll("nav button").forEach(b => {
   b.onclick = () => {
     document.querySelectorAll("nav button").forEach(x =>
@@ -90,11 +92,14 @@ document.querySelectorAll("nav button").forEach(b => {
 
     $(b.dataset.page).classList.remove("hidden");
 
-    if (b.dataset.page === "factures") updateInvoiceNumberPreview();
+    if (b.dataset.page === "factures") {
+      updateInvoiceNumberPreview();
+    }
   };
 });
 
-// Enregistrement des données
+// ===== ENREGISTREMENT DES AUTRES MODULES =====
+
 document.querySelectorAll("form[data-kind]").forEach(f => {
   f.onsubmit = async e => {
     e.preventDefault();
@@ -127,7 +132,8 @@ document.querySelectorAll("form[data-kind]").forEach(f => {
   };
 });
 
-// Chargement des données
+// ===== CHARGEMENT DES DONNÉES =====
+
 async function load(kind) {
   if (!db) return;
 
@@ -136,6 +142,8 @@ async function load(kind) {
     const data = snap.val() || {};
 
     const host = $("list-" + kind);
+    if (!host) return;
+
     host.innerHTML = "";
 
     Object.entries(data)
@@ -174,7 +182,8 @@ async function load(kind) {
   }
 }
 
-// Tableau de bord
+// ===== TABLEAU DE BORD =====
+
 async function refreshStats() {
   if (!db) return;
 
@@ -190,7 +199,6 @@ async function refreshStats() {
       $(id).textContent = s.numChildren();
     }
 
-    // Total des dépenses Firebase
     const snap = await db.ref("rdn/depenses").once("value");
 
     let total = 0;
@@ -220,18 +228,18 @@ async function refreshStats() {
   }
 }
 
-// ===== FACTURES RDN =====
+// ==================================================
+//                  FACTURES RDN
+// ==================================================
 
 function invoiceMoney(value) {
   return (Number(value) || 0).toLocaleString("fr-FR") + " Ar";
 }
 
-// Année actuelle
 function currentInvoiceYear() {
   return new Date().getFullYear();
 }
 
-// Récupération de l'année d'une facture
 function invoiceYear(item) {
   if (!item) return 0;
 
@@ -250,7 +258,8 @@ function invoiceYear(item) {
   return 0;
 }
 
-// Numérotation séquentielle annuelle
+// ===== NUMÉROTATION AUTOMATIQUE PAR ANNÉE =====
+
 function renumberInvoices(records, year = currentInvoiceYear()) {
   const all = { ...(records || {}) };
 
@@ -281,7 +290,6 @@ function nextInvoiceNumber(records, year = currentInvoiceYear()) {
   return `FA-${year}-${String(count + 1).padStart(3, "0")}`;
 }
 
-// Aperçu du numéro
 async function updateInvoiceNumberPreview() {
   const preview = document.getElementById("invoiceNumberPreview");
 
@@ -289,16 +297,15 @@ async function updateInvoiceNumberPreview() {
 
   try {
     const snap = await db.ref("rdn/factures").once("value");
-
     preview.textContent = nextInvoiceNumber(snap.val() || {});
-
   } catch (error) {
     console.warn("Aperçu du numéro de facture indisponible", error);
     preview.textContent = "Attribué à l’enregistrement";
   }
 }
 
-// Affichage des factures
+// ===== AFFICHAGE DES FACTURES =====
+
 function renderInvoiceCard(host, id, o) {
   const total = Number(o.montant) || 0;
   const paid = Number(o.acompte) || 0;
@@ -344,47 +351,86 @@ function renderInvoiceCard(host, id, o) {
   host.append(card);
 }
 
-// Formulaire facture
+// ==================================================
+//          CALENDRIER ET VÉRIFICATION DES DATES
+// ==================================================
+
 const invoiceForm = document.getElementById("invoiceForm");
 
-// Champs date obligatoires avec calendrier natif
 function dateAujourdhuiISO_RDN() {
   const d = new Date();
+
   const annee = d.getFullYear();
   const mois = String(d.getMonth() + 1).padStart(2, "0");
   const jour = String(d.getDate()).padStart(2, "0");
-  return annee + "-" + mois + "-" + jour;
+
+  return `${annee}-${mois}-${jour}`;
 }
 
 function formatDateRDN(value) {
   if (!value) return "";
+
   const parts = value.split("-");
   if (parts.length !== 3) return value;
-  return parts[2] + "/" + parts[1] + "/" + parts[0];
+
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
+// Configuration des champs calendrier et des labels
 function configurerDatesFactureRDN() {
   if (!invoiceForm) return;
 
   const dateVoyageInput = invoiceForm.elements.dateVoyage;
   const echeanceInput = invoiceForm.elements.echeance;
+
   const minimum = dateAujourdhuiISO_RDN();
 
-  if (dateVoyageInput) {
-    dateVoyageInput.type = "date";
-    dateVoyageInput.required = true;
-    dateVoyageInput.min = minimum;
-    dateVoyageInput.setAttribute("aria-label", "Date du voyage obligatoire");
-    dateVoyageInput.title = "Choisissez la date du voyage";
+  function preparerChamp(input, labelText, aideText) {
+    if (!input) return;
+
+    input.type = "date";
+    input.required = true;
+    input.min = minimum;
+
+    input.style.display = "block";
+    input.style.width = "100%";
+    input.style.marginBottom = "12px";
+
+    input.setAttribute("aria-label", labelText);
+    input.title = aideText;
+
+    const label = document.createElement("label");
+    label.textContent = labelText;
+    label.style.display = "block";
+    label.style.fontWeight = "bold";
+    label.style.fontSize = "13px";
+    label.style.marginTop = "12px";
+    label.style.marginBottom = "5px";
+    label.style.color = "#244b35";
+
+    input.insertAdjacentElement("beforebegin", label);
+
+    const aide = document.createElement("small");
+    aide.textContent = aideText;
+    aide.style.display = "block";
+    aide.style.marginTop = "-8px";
+    aide.style.marginBottom = "12px";
+    aide.style.color = "#666";
+
+    input.insertAdjacentElement("afterend", aide);
   }
 
-  if (echeanceInput) {
-    echeanceInput.type = "date";
-    echeanceInput.required = true;
-    echeanceInput.min = minimum;
-    echeanceInput.setAttribute("aria-label", "Date d'échéance obligatoire");
-    echeanceInput.title = "Choisissez la date d'échéance";
-  }
+  preparerChamp(
+    dateVoyageInput,
+    "DATE DU VOYAGE — Daty hanaovana ny excursion",
+    "Safidio ao amin'ny calendrier ny datin'ny dia."
+  );
+
+  preparerChamp(
+    echeanceInput,
+    "DATE D'ÉCHÉANCE — Daty farany handoavana ny solde",
+    "Safidio ny daty farany handoavana ny ambim-bola."
+  );
 }
 
 function verifierDateFactureRDN(input, label) {
@@ -406,6 +452,7 @@ function verifierDateFactureRDN(input, label) {
   const annee = Number(match[1]);
   const mois = Number(match[2]);
   const jour = Number(match[3]);
+
   const date = new Date(annee, mois - 1, jour);
 
   if (
@@ -418,9 +465,7 @@ function verifierDateFactureRDN(input, label) {
     return false;
   }
 
-  const minimum = dateAujourdhuiISO_RDN();
-
-  if (value < minimum) {
+  if (value < dateAujourdhuiISO_RDN()) {
     alert(label + " : une date déjà passée n'est pas autorisée.");
     input.focus();
     return false;
@@ -431,6 +476,8 @@ function verifierDateFactureRDN(input, label) {
 
 configurerDatesFactureRDN();
 
+// ===== ENREGISTREMENT FACTURE =====
+
 if (invoiceForm) {
   invoiceForm.addEventListener("submit", async event => {
     event.preventDefault();
@@ -440,12 +487,25 @@ if (invoiceForm) {
       return;
     }
 
-    // Vérification obligatoire des deux dates avant enregistrement
     const dateVoyageInput = invoiceForm.elements.dateVoyage;
     const echeanceInput = invoiceForm.elements.echeance;
 
+    // Vérification des deux dates obligatoires
     if (!verifierDateFactureRDN(dateVoyageInput, "Date du voyage")) return;
+
     if (!verifierDateFactureRDN(echeanceInput, "Date d'échéance")) return;
+
+    const dateVoyage = dateVoyageInput.value;
+    const echeance = echeanceInput.value;
+
+    // L'échéance doit être avant ou le jour du voyage
+    if (echeance > dateVoyage) {
+      alert(
+        "La date d'échéance doit être antérieure ou égale à la date du voyage."
+      );
+      echeanceInput.focus();
+      return;
+    }
 
     const fd = new FormData(invoiceForm);
     let o = {};
@@ -523,9 +583,11 @@ if (invoiceForm) {
   });
 }
 
-// ===== IMPRESSION FACTURE RDN =====
-function printRdnInvoice(o) {
+// ==================================================
+//                 IMPRESSION FACTURE
+// ==================================================
 
+function printRdnInvoice(o) {
   const esc = value =>
     String(value ?? "").replace(/[&<>"']/g, ch => ({
       "&": "&amp;",
@@ -545,9 +607,8 @@ function printRdnInvoice(o) {
     .map(x => `<li>${esc(x)}</li>`)
     .join("");
 
-  const dueDate = o.echeance || o.dateVoyage || "—";
+  const dueDate = o.echeance || "—";
 
-  // Logo sy cachet efa ao amin'ny GitHub
   const logoUrl = new URL("logo-rdn.png", window.location.href).href;
   const stampUrl = new URL("tampon.png", window.location.href).href;
 
@@ -832,7 +893,7 @@ body{
 </section>
 
 <section class="block due">
-  <b>Date d’échéance :</b>
+  <b>Date d'échéance (paiement du solde) :</b>
   ${esc(dueDate)}
 </section>
 
@@ -844,16 +905,12 @@ body{
   </div>
 
   <div class="seal-sign">
-
     <div class="stamp-block">
-
       <img
         class="stamp"
         src="${esc(stampUrl)}"
         alt="Cachet officiel RDN Expédition">
-
     </div>
-
   </div>
 
 </section>
@@ -886,5 +943,6 @@ window.onload = () => setTimeout(() => window.print(), 600);
   win.document.close();
 }
 
-// Lancement
+// ===== LANCEMENT =====
+
 init();
