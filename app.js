@@ -379,25 +379,25 @@ function formatDateRDN(value) {
 // ===== VÉRIFICATION DATE =====
 
 
-function verifierDateFactureRDN(input, titre) {
+function verifierDateFactureRDN(input, label) {
   if (!input || !input.value) {
-    alert(titre + " obligatoire.");
+    alert(label + " obligatoire : veuillez choisir une date.");
     if (input) input.focus();
     return false;
   }
 
-  const valeur = input.value;
-  const parts = valeur.split("-");
+  const value = input.value;
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
 
-  if (parts.length !== 3) {
-    alert("Date invalide : " + titre);
+  if (!match) {
+    alert(label + " invalide : veuillez choisir une date dans le calendrier.");
     input.focus();
     return false;
   }
 
-  const annee = Number(parts[0]);
-  const mois = Number(parts[1]);
-  const jour = Number(parts[2]);
+  const annee = Number(match[1]);
+  const mois = Number(match[2]);
+  const jour = Number(match[3]);
 
   const date = new Date(annee, mois - 1, jour);
 
@@ -406,19 +406,21 @@ function verifierDateFactureRDN(input, titre) {
     date.getMonth() !== mois - 1 ||
     date.getDate() !== jour
   ) {
-    alert("Date invalide : " + titre);
+    alert(label + " : cette date n'existe pas.");
     input.focus();
     return false;
   }
 
-  if (valeur < dateAujourdhuiISO_RDN()) {
-    alert(titre + " ne peut pas être une date déjà passée.");
+  if (value < dateAujourdhuiISO_RDN()) {
+    alert(label + " : une date déjà passée n'est pas autorisée.");
     input.focus();
     return false;
   }
 
   return true;
 }
+
+configurerDatesFactureRDN();
 
 
 // ===== CONFIGURATION DES CHAMPS DATE =====
