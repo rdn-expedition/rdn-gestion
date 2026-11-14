@@ -376,7 +376,8 @@ function formatDateRDN(value) {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
-// Configuration des champs calendrier et des labels
+// ===== CONFIGURATION DES CHAMPS DATE =====
+
 function configurerDatesFactureRDN() {
   if (!invoiceForm) return;
 
@@ -385,19 +386,21 @@ function configurerDatesFactureRDN() {
 
   const minimum = dateAujourdhuiISO_RDN();
 
-  function preparerChamp(input, labelText, aideText) {
+  function preparerChamp(input, labelText, placeholderText, aideText) {
     if (!input) return;
 
     input.type = "date";
     input.required = true;
     input.min = minimum;
 
+    // Placeholder et texte d'aide
+    input.placeholder = placeholderText;
+    input.setAttribute("aria-label", labelText);
+    input.title = aideText;
+
     input.style.display = "block";
     input.style.width = "100%";
     input.style.marginBottom = "12px";
-
-    input.setAttribute("aria-label", labelText);
-    input.title = aideText;
 
     const label = document.createElement("label");
     label.textContent = labelText;
@@ -411,25 +414,28 @@ function configurerDatesFactureRDN() {
     input.insertAdjacentElement("beforebegin", label);
 
     const aide = document.createElement("small");
-    aide.textContent = aideText;
+    aide.textContent = placeholderText + " — " + aideText;
     aide.style.display = "block";
     aide.style.marginTop = "-8px";
     aide.style.marginBottom = "12px";
     aide.style.color = "#666";
+    aide.style.fontSize = "12px";
 
     input.insertAdjacentElement("afterend", aide);
   }
 
   preparerChamp(
     dateVoyageInput,
-    "DATE DU VOYAGE — Daty hanaovana ny excursion",
-    "Safidio ao amin'ny calendrier ny datin'ny dia."
+    "DATE DU VOYAGE",
+    "Safidio eto ny datin'ny dia",
+    "Daty hanaovana ny excursion."
   );
 
   preparerChamp(
     echeanceInput,
-    "DATE D'ÉCHÉANCE — Daty farany handoavana ny solde",
-    "Safidio ny daty farany handoavana ny ambim-bola."
+    "DATE D'ÉCHÉANCE",
+    "Safidio eto ny daty farany handoavana ny solde",
+    "Daty farany handoavana ny ambim-bola."
   );
 }
 
@@ -490,15 +496,12 @@ if (invoiceForm) {
     const dateVoyageInput = invoiceForm.elements.dateVoyage;
     const echeanceInput = invoiceForm.elements.echeance;
 
-    // Vérification des deux dates obligatoires
     if (!verifierDateFactureRDN(dateVoyageInput, "Date du voyage")) return;
-
     if (!verifierDateFactureRDN(echeanceInput, "Date d'échéance")) return;
 
     const dateVoyage = dateVoyageInput.value;
     const echeance = echeanceInput.value;
 
-    // L'échéance doit être avant ou le jour du voyage
     if (echeance > dateVoyage) {
       alert(
         "La date d'échéance doit être antérieure ou égale à la date du voyage."
@@ -514,7 +517,6 @@ if (invoiceForm) {
       o[key] = String(value).trim();
     });
 
-    // Conversion AAAA-MM-JJ vers JJ/MM/AAAA
     o.dateVoyage = formatDateRDN(o.dateVoyage);
     o.echeance = formatDateRDN(o.echeance);
 
