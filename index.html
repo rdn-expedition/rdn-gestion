@@ -119,7 +119,10 @@
   <h1>Réservations</h1>
 
   <form data-kind="reservations">
-    <select name="clientId" required><option value="">Choisir un client</option></select>
+    <input name="clientNom" required list="clientsSuggestions" autocomplete="name" placeholder="Nom complet du client">
+    <datalist id="clientsSuggestions"></datalist>
+    <input name="clientTelephone" type="tel" autocomplete="tel" placeholder="Téléphone du client">
+    <small class="form-hint">Client existant : saisissez ou choisissez son nom. Nouveau client : sa fiche sera créée automatiquement.</small>
     <select name="excursionId" required><option value="">Choisir une excursion</option></select>
     <input name="personnes" type="number" min="1" value="1" placeholder="Personnes">
     <input name="acompte" type="number" min="0" placeholder="Acompte (Ar)">
