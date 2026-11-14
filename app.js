@@ -347,6 +347,90 @@ function renderInvoiceCard(host, id, o) {
 // Formulaire facture
 const invoiceForm = document.getElementById("invoiceForm");
 
+// Champs date obligatoires avec calendrier natif
+function dateAujourdhuiISO_RDN() {
+  const d = new Date();
+  const annee = d.getFullYear();
+  const mois = String(d.getMonth() + 1).padStart(2, "0");
+  const jour = String(d.getDate()).padStart(2, "0");
+  return annee + "-" + mois + "-" + jour;
+}
+
+function formatDateRDN(value) {
+  if (!value) return "";
+  const parts = value.split("-");
+  if (parts.length !== 3) return value;
+  return parts[2] + "/" + parts[1] + "/" + parts[0];
+}
+
+function configurerDatesFactureRDN() {
+  if (!invoiceForm) return;
+
+  const dateVoyageInput = invoiceForm.elements.dateVoyage;
+  const echeanceInput = invoiceForm.elements.echeance;
+  const minimum = dateAujourdhuiISO_RDN();
+
+  if (dateVoyageInput) {
+    dateVoyageInput.type = "date";
+    dateVoyageInput.required = true;
+    dateVoyageInput.min = minimum;
+    dateVoyageInput.setAttribute("aria-label", "Date du voyage obligatoire");
+    dateVoyageInput.title = "Choisissez la date du voyage";
+  }
+
+  if (echeanceInput) {
+    echeanceInput.type = "date";
+    echeanceInput.required = true;
+    echeanceInput.min = minimum;
+    echeanceInput.setAttribute("aria-label", "Date d'échéance obligatoire");
+    echeanceInput.title = "Choisissez la date d'échéance";
+  }
+}
+
+function verifierDateFactureRDN(input, label) {
+  if (!input || !input.value) {
+    alert(label + " obligatoire : veuillez choisir une date.");
+    if (input) input.focus();
+    return false;
+  }
+
+  const value = input.value;
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  if (!match) {
+    alert(label + " invalide : veuillez choisir une date dans le calendrier.");
+    input.focus();
+    return false;
+  }
+
+  const annee = Number(match[1]);
+  const mois = Number(match[2]);
+  const jour = Number(match[3]);
+  const date = new Date(annee, mois - 1, jour);
+
+  if (
+    date.getFullYear() !== annee ||
+    date.getMonth() !== mois - 1 ||
+    date.getDate() !== jour
+  ) {
+    alert(label + " : cette date n'existe pas.");
+    input.focus();
+    return false;
+  }
+
+  const minimum = dateAujourdhuiISO_RDN();
+
+  if (value < minimum) {
+    alert(label + " : une date déjà passée n'est pas autorisée.");
+    input.focus();
+    return false;
+  }
+
+  return true;
+}
+
+configurerDatesFactureRDN();
+
 if (invoiceForm) {
   invoiceForm.addEventListener("submit", async event => {
     event.preventDefault();
@@ -356,12 +440,23 @@ if (invoiceForm) {
       return;
     }
 
+    // Vérification obligatoire des deux dates avant enregistrement
+    const dateVoyageInput = invoiceForm.elements.dateVoyage;
+    const echeanceInput = invoiceForm.elements.echeance;
+
+    if (!verifierDateFactureRDN(dateVoyageInput, "Date du voyage")) return;
+    if (!verifierDateFactureRDN(echeanceInput, "Date d'échéance")) return;
+
     const fd = new FormData(invoiceForm);
     let o = {};
 
     fd.forEach((value, key) => {
       o[key] = String(value).trim();
     });
+
+    // Conversion AAAA-MM-JJ vers JJ/MM/AAAA
+    o.dateVoyage = formatDateRDN(o.dateVoyage);
+    o.echeance = formatDateRDN(o.echeance);
 
     o.montant = Number(o.montant) || 0;
     o.acompte = Number(o.acompte) || 0;
