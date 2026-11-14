@@ -754,19 +754,15 @@ body{
 .due{margin-top:2px}
 
 .bottom{
-  display:grid;
-  grid-template-columns:1fr 1fr;
+  margin:0 8px;
   gap:4px;
-  align-items:start;
-  margin:3px 8px 0;
-  min-height:0
 }
 
 .contacts{
-  font-size:13px;
-  line-height:1.3
+  margin:0;
+  padding:0;
+  line-height:1.15;
 }
-
 .seal-sign{
   display:flex;
   align-items:flex-start;
