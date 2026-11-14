@@ -255,7 +255,7 @@ function renumberInvoices(records, year = currentInvoiceYear()) {
   const all = { ...(records || {}) };
 
   const entries = Object.entries(all)
-    .filter(([, item]) => invoiceYear(item, year) === year)
+    .filter(([, item]) => invoiceYear(item) === year)
     .sort((a, b) => {
       const ta = Number(a[1] && a[1].createdAt) || 0;
       const tb = Number(b[1] && b[1].createdAt) || 0;
@@ -275,7 +275,7 @@ function renumberInvoices(records, year = currentInvoiceYear()) {
 
 function nextInvoiceNumber(records, year = currentInvoiceYear()) {
   const count = Object.values(records || {})
-    .filter(item => invoiceYear(item, year) === year)
+    .filter(item => invoiceYear(item) === year)
     .length;
 
   return `FA-${year}-${String(count + 1).padStart(3, "0")}`;
@@ -428,7 +428,7 @@ if (invoiceForm) {
   });
 }
 
-// Impression facture RDN
+// ===== IMPRESSION FACTURE RDN =====
 function printRdnInvoice(o) {
 
   const esc = value =>
@@ -450,13 +450,9 @@ function printRdnInvoice(o) {
     .map(x => `<li>${esc(x)}</li>`)
     .join("");
 
-  const stampStatus =
-    balance <= 0 ? "FACTURE ACQUITTÉE" :
-    paid > 0 ? "FACTURE D’ACOMPTE" :
-    "FACTURE";
-
   const dueDate = o.echeance || o.dateVoyage || "—";
 
+  // Logo sy cachet efa ao amin'ny GitHub
   const logoUrl = new URL("logo-rdn.png", window.location.href).href;
   const stampUrl = new URL("tampon.png", window.location.href).href;
 
@@ -468,102 +464,149 @@ function printRdnInvoice(o) {
 <title>${esc(o.numero || "Facture RDN")}</title>
 
 <style>
-@page{size:A4;margin:8mm}
+@page{size:A4;margin:9mm}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
+
 body{
   font-family:Arial,Helvetica,sans-serif;
   color:#171717;
   font-size:12px;
-  line-height:1.34;
+  line-height:1.4;
   -webkit-print-color-adjust:exact;
   print-color-adjust:exact
 }
-.sheet{width:100%;min-height:280mm;position:relative}
+
+.sheet{
+  width:100%;
+  min-height:279mm;
+  position:relative
+}
+
 .top{
   background:#168fe8;
   color:#fff;
-  padding:9px 11px 8px;
+  padding:9px 12px;
   display:grid;
   grid-template-columns:112px 1fr;
-  gap:12px;
+  gap:14px;
   align-items:center;
-  border:2px solid #fff;
-  outline:1px solid #d7e9f7
+  border:1px solid #dcecf8
 }
+
 .logo{
-  width:112px;
-  height:112px;
+  width:108px;
+  height:108px;
   object-fit:contain;
   background:#fff;
   display:block
 }
+
 .brand h1{
-  font-size:34px;
-  line-height:1.05;
-  margin:0 0 7px;
+  font-size:30px;
+  line-height:1.1;
+  margin:0 0 8px;
   text-align:center;
-  letter-spacing:.1px;
-  white-space:nowrap
+  letter-spacing:.2px
 }
-.mail{text-align:center;font-size:14px;margin:0 0 11px}
+
+.mail{
+  text-align:center;
+  font-size:13px;
+  margin-bottom:12px
+}
+
 .meta{
   display:flex;
   justify-content:space-between;
-  align-items:center;
-  gap:8px;
+  gap:10px;
   font-weight:bold;
-  margin-top:7px;
-  font-size:12px
+  margin-top:8px;
+  font-size:11px
 }
-.client{padding:11px 9px 9px;line-height:1.85;font-size:13px}
+
+.client{
+  padding:12px 10px 10px;
+  line-height:1.9;
+  font-size:13px
+}
+
 .details{
   width:100%;
   border-collapse:collapse;
-  margin-top:2px;
+  margin-top:3px;
   font-size:13px
 }
+
 .details td{
-  padding:9px 11px;
+  padding:10px 12px;
   border:2px solid #fff;
   background:#e2f1fc
 }
-.details .head{background:#b9def9}
-.details td:first-child{font-weight:bold;width:54%}
+
+.details .head{
+  background:#b9def9
+}
+
+.details td:first-child{
+  font-weight:bold;
+  width:54%
+}
+
 .details .totalrow td{
   background:#fff;
   font-size:14px;
-  padding-top:10px;
-  padding-bottom:10px
+  padding-top:11px;
+  padding-bottom:11px
 }
-.block{padding:8px 12px;line-height:1.45;font-size:13px}
-.block ul{margin:2px 0 0 25px;padding-left:12px}
-.section-label{font-weight:bold;color:#111}
+
+.block{
+  padding:8px 12px;
+  line-height:1.5;
+  font-size:13px
+}
+
+.block ul{
+  margin:3px 0 0 22px;
+  padding-left:12px
+}
+
+.section-label{
+  font-weight:bold;
+  color:#111
+}
+
 .note{margin-top:1px}
 .due{margin-top:2px}
+
 .bottom{
   display:grid;
-  grid-template-columns:1fr 1.55fr;
+  grid-template-columns:1fr 1fr;
   gap:8px;
   align-items:center;
-  margin:12px 8px 0;
-  min-height:155px
+  margin:18px 8px 0;
+  min-height:165px
 }
-.contacts{font-size:13px;line-height:2.2}
+
+.contacts{
+  font-size:13px;
+  line-height:2.1
+}
+
 .seal-sign{
   display:flex;
   align-items:center;
-  justify-content:flex-end;
-  gap:12px
+  justify-content:flex-end
 }
+
 .stamp-block{
   display:flex;
   flex-direction:column;
   align-items:center;
   justify-content:center;
-  gap:5px;
   max-width:190px
 }
+
 .stamp{
   width:165px;
   height:165px;
@@ -571,25 +614,21 @@ body{
   object-fit:contain;
   display:block
 }
-.responsable{
-  text-align:center;
-  font-weight:bold;
-  color:#111;
-  font-size:12px;
-  line-height:1.35
-}
+
 .thanks{
   font-style:italic;
   color:#111;
-  margin:8px 9px 10px;
+  margin:8px 9px 12px;
   font-size:13px;
   line-height:1.5
 }
+
 .footer{
   height:13px;
   background:#168fe8;
   border-top:3px solid #dceefb
 }
+
 @media screen{
   body{
     max-width:800px;
@@ -599,6 +638,7 @@ body{
     box-shadow:0 1px 8px #ccd5dd
   }
 }
+
 @media print{
   body{padding:0}
   .top,.details td,.footer{
@@ -613,9 +653,13 @@ body{
 <main class="sheet">
 
 <header class="top">
-  <img class="logo" src="${esc(logoUrl)}" alt="Logo RDN">
+
+  <img class="logo"
+       src="${esc(logoUrl)}"
+       alt="Logo RDN">
 
   <div class="brand">
+
     <h1>RDN EXPÉDITION</h1>
 
     <div class="mail">rdnexpedition@gmail.com</div>
@@ -629,7 +673,9 @@ body{
       <span>STAT : 79120 11 2025 0 04198</span>
       <span>${esc(o.date || "")}</span>
     </div>
+
   </div>
+
 </header>
 
 <section class="client">
@@ -639,6 +685,7 @@ body{
 </section>
 
 <table class="details">
+
   <tr>
     <td class="head" colspan="2">
       <b>Détails des services :</b>
@@ -666,6 +713,7 @@ body{
     <td>Montant total du voyage :</td>
     <td>${invoiceMoney(total)}</td>
   </tr>
+
 </table>
 
 <section class="block">
@@ -674,10 +722,13 @@ body{
 </section>
 
 <section class="block">
+
   <b class="section-label">INCLUS :</b>
+
   <ul>
     ${included || "<li>Prestations indiquées ci-dessus</li>"}
   </ul>
+
 </section>
 
 <section class="block note">
@@ -686,7 +737,8 @@ body{
 </section>
 
 <section class="block due">
-  <b>Date d’échéance :</b> ${esc(dueDate)}
+  <b>Date d’échéance :</b>
+  ${esc(dueDate)}
 </section>
 
 <section class="bottom">
@@ -699,15 +751,12 @@ body{
   <div class="seal-sign">
 
     <div class="stamp-block">
+
       <img
         class="stamp"
         src="${esc(stampUrl)}"
-        alt="Cachet officiel RDN Expédition"
-      >
+        alt="Cachet officiel RDN Expédition">
 
-      <div class="responsable">
-        RANOHARIANTSOA Dina Nasandratra
-      </div>
     </div>
 
   </div>
@@ -724,8 +773,8 @@ body{
 </main>
 
 <script>
-window.onload=()=>setTimeout(()=>window.print(),600);
-</script>
+window.onload = () => setTimeout(() => window.print(), 600);
+<\/script>
 
 </body>
 </html>`;
