@@ -38,6 +38,21 @@ function parseMontant(value) {
   return Number(montant) || 0;
 }
 
+// ===== CAPITALISATION CLIENTS / EXCURSIONS / RÉSERVATIONS =====
+
+function capitaliserNom(texte) {
+  return String(texte || "")
+    .trim()
+    .toLocaleLowerCase("fr")
+    .replace(/(^|[\s'-])(\p{L})/gu, (match, separateur, lettre) =>
+      separateur + lettre.toLocaleUpperCase("fr")
+    );
+}
+
+function capitaliserLabel(texte) {
+  return texte.charAt(0).toLocaleUpperCase("fr") + texte.slice(1);
+}
+
 // ===== INITIALISATION =====
 
 function init() {
