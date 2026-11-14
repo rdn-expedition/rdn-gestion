@@ -433,16 +433,14 @@ function configurerDatesFactureRDN() {
   }
 
   preparerChamp(
-    dateVoyageInput,
-    "Date du voyage",
-    "Safidio ny datin'ny dia"
-  );
+  dateVoyageInput,
+  "Date du voyage"
+);
 
-  preparerChamp(
-    echeanceInput,
-    "Date d'échéance",
-    "Safidio ny daty farany handoavana ny solde"
-  );
+preparerChamp(
+  echeanceInput,
+  "Date d'échéance"
+);
 }
 
 configurerDatesFactureRDN();
