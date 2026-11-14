@@ -384,59 +384,66 @@ function configurerDatesFactureRDN() {
 
   const dateVoyageInput = invoiceForm.elements.dateVoyage;
   const echeanceInput = invoiceForm.elements.echeance;
-
   const minimum = dateAujourdhuiISO_RDN();
 
-  function preparerChamp(input, labelText, placeholderText) {
+  function preparerChamp(input, titre, aideText) {
     if (!input) return;
+
+    // Esorina ny anciens labels sy fanazavana raha efa nisy
+    if (input.previousElementSibling?.classList.contains("rdn-date-label")) {
+      input.previousElementSibling.remove();
+    }
+
+    if (input.nextElementSibling?.classList.contains("rdn-date-aide")) {
+      input.nextElementSibling.remove();
+    }
 
     input.type = "date";
     input.required = true;
     input.min = minimum;
-
-    input.setAttribute("aria-label", labelText);
-    input.title = placeholderText;
-
-    input.style.display = "block";
-    input.style.width = "100%";
-    input.style.padding = "12px";
-    input.style.marginTop = "6px";
-    input.style.marginBottom = "16px";
+    input.setAttribute("aria-label", titre);
 
     const label = document.createElement("label");
-    label.textContent = labelText;
+    label.className = "rdn-date-label";
+    label.textContent = titre;
     label.style.display = "block";
+    label.style.width = "100%";
     label.style.fontWeight = "bold";
     label.style.fontSize = "14px";
+    label.style.textTransform = "none";
     label.style.marginTop = "14px";
     label.style.marginBottom = "5px";
     label.style.color = "#244b35";
 
     input.insertAdjacentElement("beforebegin", label);
 
+    input.style.display = "block";
+    input.style.width = "100%";
+    input.style.marginBottom = "4px";
+
     const aide = document.createElement("small");
-    aide.textContent = placeholderText;
+    aide.className = "rdn-date-aide";
+    aide.textContent = aideText;
     aide.style.display = "block";
+    aide.style.width = "100%";
     aide.style.color = "#777";
-    aide.style.marginTop = "-10px";
-    aide.style.marginBottom = "12px";
+    aide.style.marginBottom = "14px";
 
     input.insertAdjacentElement("afterend", aide);
   }
 
   preparerChamp(
-  dateVoyageInput,
-  "Date du voyage"
-);
+    dateVoyageInput,
+    "Date du voyage",
+    "Safidio ny datin'ny dia"
+  );
 
-preparerChamp(
-  echeanceInput,
-  "Date d'échéance"
-);
-
-  
+  preparerChamp(
+    echeanceInput,
+    "Date d'échéance",
+    "Safidio ny daty farany handoavana ny solde"
+  );
 }
-
 
 configurerDatesFactureRDN();
 
