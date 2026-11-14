@@ -376,8 +376,44 @@ function formatDateRDN(value) {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
-// ===== CONFIGURATION DES CHAMPS DATE =====
+// ===== VÉRIFICATION DATE =====
 
+function verifierDateFactureRDN(input, titre) {
+  if (!input || !input.value) {
+    alert(titre + " obligatoire.");
+    if (input) input.focus();
+    return false;
+  }
+
+  const valeur = input.value;
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(valeur)) {
+    alert("Format de date invalide pour : " + titre);
+    input.focus();
+    return false;
+  }
+
+  const date = new Date(valeur + "T00:00:00");
+
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.toISOString().slice(0, 10) !== valeur
+  ) {
+    alert("La date saisie est invalide : " + titre);
+    input.focus();
+    return false;
+  }
+
+  if (valeur < dateAujourdhuiISO_RDN()) {
+    alert(titre + " ne peut pas être une date déjà passée.");
+    input.focus();
+    return false;
+  }
+
+  return true;
+}
+
+// ===== CONFIGURATION DES CHAMPS DATE =====
 
 function configurerDatesFactureRDN() {
   if (!invoiceForm) return;
@@ -386,10 +422,9 @@ function configurerDatesFactureRDN() {
   const echeanceInput = invoiceForm.elements.echeance;
   const minimum = dateAujourdhuiISO_RDN();
 
-  function preparerChamp(input, titre, aideText) {
+  function preparerChamp(input, titre) {
     if (!input) return;
 
-    // Esorina ny anciens labels sy fanazavana raha efa nisy
     if (input.previousElementSibling?.classList.contains("rdn-date-label")) {
       input.previousElementSibling.remove();
     }
@@ -419,28 +454,18 @@ function configurerDatesFactureRDN() {
 
     input.style.display = "block";
     input.style.width = "100%";
-    input.style.marginBottom = "4px";
-
-    const aide = document.createElement("small");
-    aide.className = "rdn-date-aide";
-    aide.textContent = aideText;
-    aide.style.display = "block";
-    aide.style.width = "100%";
-    aide.style.color = "#777";
-    aide.style.marginBottom = "14px";
-
-    input.insertAdjacentElement("afterend", aide);
+    input.style.marginBottom = "14px";
   }
 
   preparerChamp(
-  dateVoyageInput,
-  "Date du voyage"
-);
+    dateVoyageInput,
+    "Date du voyage"
+  );
 
-preparerChamp(
-  echeanceInput,
-  "Date d'échéance"
-);
+  preparerChamp(
+    echeanceInput,
+    "Date d'échéance"
+  );
 }
 
 configurerDatesFactureRDN();
@@ -480,22 +505,39 @@ if (invoiceForm) {
       o[key] = String(value).trim();
     });
 
-    o.dateVoyage = formatDateRDN(o.dateVoyage);
-    o.echeance = formatDateRDN(o.echeance);
+    o.montant = Number(o.montant);
+    o.acompte = Number(o.acompte);
+    o.personnes = Number(o.personnes);
 
-    o.montant = Number(o.montant) || 0;
-    o.acompte = Number(o.acompte) || 0;
-    o.personnes = Math.max(1, Number(o.personnes) || 1);
+    // Effectif minimum : 1 personne
+    if (!Number.isInteger(o.personnes) || o.personnes < 1) {
+      alert("L'effectif minimum est de 1 personne.");
+      invoiceForm.elements.personnes.focus();
+      return;
+    }
 
-    if (o.montant <= 0) {
-      alert("Le montant total doit être supérieur à zéro.");
+    // Montant total minimum : 10 000 Ar
+    if (!Number.isFinite(o.montant) || o.montant < 10000) {
+      alert("Le montant total minimum est de 10 000 Ar (5 chiffres).");
+      invoiceForm.elements.montant.focus();
+      return;
+    }
+
+    // Acompte minimum : 10 000 Ar
+    if (!Number.isFinite(o.acompte) || o.acompte < 10000) {
+      alert("L'acompte minimum est de 10 000 Ar.");
+      invoiceForm.elements.acompte.focus();
       return;
     }
 
     if (o.acompte > o.montant) {
       alert("L'acompte ne peut pas dépasser le montant total.");
+      invoiceForm.elements.acompte.focus();
       return;
     }
+
+    o.dateVoyage = formatDateRDN(dateVoyage);
+    o.echeance = formatDateRDN(echeance);
 
     o.solde = o.montant - o.acompte;
     o.date = new Date().toLocaleDateString("fr-FR");
@@ -535,7 +577,8 @@ if (invoiceForm) {
       invoiceForm.reset();
 
       invoiceForm.elements.personnes.value = 1;
-      invoiceForm.elements.acompte.value = 0;
+      invoiceForm.elements.montant.value = "";
+      invoiceForm.elements.acompte.value = 10000;
 
       await load("factures");
       await updateInvoiceNumberPreview();
