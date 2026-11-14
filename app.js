@@ -767,7 +767,7 @@ body{
 .thanks{
   font-style:italic;
   color:#111;
-  margin:26px 0;
+  margin:26px 12px 0;
   padding:0;
   font-size:13px;
   line-height:1.2;
@@ -783,7 +783,7 @@ body{
 .stamp-block{
   position:absolute;
   right:0;
-  bottom:0;
+  bottom:-5;
   z-index:5;
   max-width:165px;
   margin:0;
