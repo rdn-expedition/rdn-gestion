@@ -759,7 +759,7 @@ body{
 }
 
 .contacts{
-  margin: 0 5px 0;
+  margin: 26px 5px 0;
   padding:0;
   line-height:1.15;
 }
