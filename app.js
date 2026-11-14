@@ -767,7 +767,7 @@ body{
 .thanks{
   font-style:italic;
   color:#111;
-  margin: 9px 9px 0;
+  margin: 12px 12px 0;
   padding:0;
   font-size:13px;
   line-height:1.2;
