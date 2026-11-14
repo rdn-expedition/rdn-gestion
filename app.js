@@ -2,6 +2,9 @@
 const $ = id => document.getElementById(id);
 
 let auth, db, currentUser = null;
+const dataCache = { clients:{}, excursions:{}, reservations:{}, factures:{}, depenses:{} };
+const dbListeners = {};
+let savingGenericForm = false;
 
 const kinds = [
   "clients",
@@ -54,9 +57,12 @@ function init() {
     $("app").classList.toggle("hidden", !u);
 
     if (u) {
-      kinds.forEach(load);
-      refreshStats();
+      startRealtimeSync();
       updateInvoiceNumberPreview();
+    } else {
+      stopRealtimeSync();
+      kinds.forEach(kind => { dataCache[kind] = {}; renderKind(kind); });
+      refreshStats();
     }
   });
 }
@@ -103,132 +109,159 @@ document.querySelectorAll("nav button").forEach(b => {
 document.querySelectorAll("form[data-kind]").forEach(f => {
   f.onsubmit = async e => {
     e.preventDefault();
-
-    if (!db) {
-      alert("Firebase n'est pas encore configuré.");
-      return;
-    }
-
+    if (!db || !currentUser) { alert("Veuillez vous connecter avant d'enregistrer."); return; }
+    if (savingGenericForm) return;
     const obj = {};
-
-    new FormData(f).forEach((v, k) => {
-      obj[k] = v;
-    });
-
-    obj.createdAt = Date.now();
-
-    try {
-      await db.ref("rdn/" + f.dataset.kind).push(obj);
-
-      f.reset();
-
-      await load(f.dataset.kind);
-      await refreshStats();
-
-      alert("Enregistrement effectué avec succès !");
-    } catch (err) {
-      alert("Erreur d'enregistrement : " + err.message);
+    new FormData(f).forEach((v,k) => { obj[k]=v; });
+    if (f.dataset.kind === "reservations") {
+      const client=dataCache.clients[obj.clientId], excursion=dataCache.excursions[obj.excursionId];
+      if (!client || !excursion) { alert("Veuillez sélectionner un client et une excursion valides."); return; }
+      obj.client=client.nom||""; obj.clientTelephone=client.telephone||"";
+      obj.excursion=excursion.titre||""; obj.excursionDate=excursion.date||"";
+      obj.prixUnitaire=parseMontant(excursion.prix); obj.clientId=String(obj.clientId); obj.excursionId=String(obj.excursionId);
+      obj.personnes=Math.max(1,Number(obj.personnes)||1); obj.acompte=parseMontant(obj.acompte);
     }
+    obj.createdAt=Date.now(); obj.createdBy=currentUser.uid; obj.createdByEmail=currentUser.email||"";
+    savingGenericForm=true;
+    const submit=f.querySelector('button[type="submit"], button:not([type])'); if(submit) submit.disabled=true;
+    try {
+      await db.ref("rdn/"+f.dataset.kind).push(obj); f.reset();
+      if(f.dataset.kind==="reservations" && f.elements.personnes) f.elements.personnes.value=1;
+      alert("Enregistrement effectué avec succès !");
+    } catch(err) { alert("Erreur d'enregistrement : "+err.message); }
+    finally { savingGenericForm=false; if(submit) submit.disabled=false; }
   };
 });
 
-// ===== CHARGEMENT DES DONNÉES =====
-
-async function load(kind) {
-  if (!db) return;
-
-  try {
-    const snap = await db.ref("rdn/" + kind).once("value");
-    const data = snap.val() || {};
-
-    const host = $("list-" + kind);
-    if (!host) return;
-
-    host.innerHTML = "";
-
-    Object.entries(data)
-      .sort((a, b) =>
-        (Number(b[1].createdAt) || 0) -
-        (Number(a[1].createdAt) || 0)
-      )
-      .forEach(([id, o]) => {
-        if (kind === "factures") {
-          renderInvoiceCard(host, id, o);
-          return;
-        }
-
-        const div = document.createElement("div");
-        div.className = "item";
-
-        const main = labels[kind]
-          .map(k => o[k] ? `${k}: ${o[k]}` : "")
-          .filter(Boolean)
-          .join(" • ");
-
-        const left = document.createElement("span");
-        left.textContent = main;
-
-        const right = document.createElement("small");
-        right.textContent = new Date(
-          o.createdAt || Date.now()
-        ).toLocaleDateString("fr-FR");
-
-        div.append(left, right);
-        host.append(div);
-      });
-
-  } catch (e) {
-    console.error("Erreur chargement " + kind, e);
-  }
-}
-
-// ===== TABLEAU DE BORD =====
-
-async function refreshStats() {
-  if (!db) return;
-
-  try {
-    const stats = [
-      ["clients", "nClients"],
-      ["excursions", "nExcursions"],
-      ["reservations", "nReservations"]
-    ];
-
-    for (const [kind, id] of stats) {
-      const s = await db.ref("rdn/" + kind).once("value");
-      $(id).textContent = s.numChildren();
-    }
-
-    const snap = await db.ref("rdn/depenses").once("value");
-
-    let total = 0;
-
-    snap.forEach(item => {
-      const d = item.val();
-
-      if (d && d.montant !== undefined) {
-        let montant = String(d.montant)
-          .replace(/\s/g, "")
-          .replace(/Ar/gi, "")
-          .replace(/,/g, ".")
-          .replace(/[^\d.-]/g, "");
-
-        total += Number(montant) || 0;
-      }
+// ===== SYNCHRONISATION TEMPS RÉEL =====
+function startRealtimeSync() {
+  if(!db||!currentUser) return;
+  kinds.forEach(kind=>{
+    if(dbListeners[kind]) return;
+    const ref=db.ref("rdn/"+kind);
+    const callback=snapshot=>{
+      dataCache[kind]=snapshot.val()||{};
+      renderKind(kind); refreshStats();
+      if(kind==="clients"||kind==="excursions") refreshReservationChoices();
+      if(kind==="factures") updateInvoiceNumberPreview();
+      const status=document.getElementById("syncStatus"); if(status) status.textContent="Synchronisation en temps réel";
+    };
+    ref.on("value",callback,error=>{
+      console.error("Synchronisation "+kind+" impossible :",error);
+      const status=document.getElementById("syncStatus"); if(status) status.textContent="Erreur de synchronisation";
     });
-
-    $("sumDepenses").textContent =
-      total.toLocaleString("fr-FR") + " Ar";
-
-    console.log("Nombre dépenses :", snap.numChildren());
-    console.log("Total dépenses :", total);
-
-  } catch (e) {
-    console.error("Erreur actualisation tableau de bord :", e);
-  }
+    dbListeners[kind]={ref,callback};
+  });
+}
+function stopRealtimeSync() {
+  Object.values(dbListeners).forEach(({ref,callback})=>ref.off("value",callback));
+  Object.keys(dbListeners).forEach(k=>delete dbListeners[k]);
+  const status=document.getElementById("syncStatus"); if(status) status.textContent="Déconnecté";
+}
+function load(kind) { renderKind(kind); }
+function renderKind(kind) {
+  const host=$("list-"+kind); if(!host) return;
+  host.innerHTML="";
+  Object.entries(dataCache[kind]||{}).sort((a,b)=>(Number(b[1]?.createdAt)||0)-(Number(a[1]?.createdAt)||0)).forEach(([id,o])=>{
+    if(kind==="factures"){renderInvoiceCard(host,id,o);return;}
+    const div=document.createElement("div"); div.className="item";
+    const main=(labels[kind]||[]).map(k=>o[k]!==undefined&&o[k]!==""?`${k}: ${o[k]}`:"").filter(Boolean).join(" • ");
+    const left=document.createElement("span"); left.textContent=main||"(Sans détail)";
+    const right=document.createElement("small"); right.textContent=new Date(Number(o.createdAt)||Date.now()).toLocaleDateString("fr-FR");
+    const actions=document.createElement("div"); actions.className="record-actions";
+    const edit=document.createElement("button"); edit.type="button"; edit.className="record-edit"; edit.textContent="Modifier"; edit.onclick=()=>editRecord(kind,id,o);
+    const del=document.createElement("button"); del.type="button"; del.className="record-delete"; del.textContent="Supprimer"; del.onclick=()=>deleteRecord(kind,id,o);
+    actions.append(edit,del); div.append(left,right,actions);
+    if(kind==="reservations") { const inv=document.createElement("button"); inv.type="button"; inv.className="record-invoice"; inv.textContent="Préparer une facture"; inv.onclick=()=>prepareInvoiceFromReservation({...o,id}); div.append(inv); }
+    host.append(div);
+  });
+  if(kind==="reservations") refreshReservationChoices();
+}
+function refreshStats() {
+  [["clients","nClients"],["excursions","nExcursions"],["reservations","nReservations"]].forEach(([k,id])=>{const el=$(id);if(el)el.textContent=Object.keys(dataCache[k]||{}).length;});
+  const total=Object.values(dataCache.depenses||{}).reduce((sum,d)=>sum+parseMontant(d?.montant),0);
+  const el=$("sumDepenses"); if(el)el.textContent=total.toLocaleString("fr-FR")+" Ar";
 }
 
-// ==================================================
+// ===== LIAISON CLIENTS / EXCURSIONS / RÉSERVATIONS =====
+function refreshReservationChoices() {
+  const form=document.querySelector('form[data-kind="reservations"]'); if(!form)return;
+  const cs=form.elements.clientId, es=form.elements.excursionId; if(!cs||!es)return;
+  const oldC=cs.value, oldE=es.value;
+  cs.innerHTML='<option value="">Choisir un client</option>';
+  Object.entries(dataCache.clients||{}).forEach(([id,c])=>{const op=document.createElement("option");op.value=id;op.textContent=c.nom||"Client sans nom";cs.append(op);});
+  es.innerHTML='<option value="">Choisir une excursion</option>';
+  Object.entries(dataCache.excursions||{}).forEach(([id,x])=>{const op=document.createElement("option");op.value=id;op.textContent=[x.titre||"Excursion",x.date||"",x.prix?parseMontant(x.prix).toLocaleString("fr-FR")+" Ar":""].filter(Boolean).join(" — ");es.append(op);});
+  if(oldC&&dataCache.clients[oldC])cs.value=oldC; if(oldE&&dataCache.excursions[oldE])es.value=oldE;
+}
+async function editRecord(kind,id,record) {
+  const updated={...record};
+  if(kind==="reservations") {
+    const clients=Object.entries(dataCache.clients||{});
+    const excursions=Object.entries(dataCache.excursions||{});
+    if(!clients.length||!excursions.length){alert("Ajoutez au moins un client et une excursion avant de modifier cette réservation.");return;}
+    const clientList=clients.map(([key,c],i)=>`${i+1}. ${c.nom||"Client"}`).join("\n");
+    const clientChoice=prompt("Choisir le numéro du client :\n"+clientList,String(Math.max(1,clients.findIndex(([key])=>key===record.clientId)+1)));
+    if(clientChoice===null)return;
+    const client=clients[Number(clientChoice)-1]; if(!client){alert("Numéro de client invalide.");return;}
+    const excursionList=excursions.map(([key,x],i)=>`${i+1}. ${x.titre||"Excursion"} ${x.date||""}`).join("\n");
+    const excursionChoice=prompt("Choisir le numéro de l'excursion :\n"+excursionList,String(Math.max(1,excursions.findIndex(([key])=>key===record.excursionId)+1)));
+    if(excursionChoice===null)return;
+    const excursion=excursions[Number(excursionChoice)-1]; if(!excursion){alert("Numéro d'excursion invalide.");return;}
+    updated.clientId=client[0]; updated.client=client[1].nom||""; updated.clientTelephone=client[1].telephone||"";
+    updated.excursionId=excursion[0]; updated.excursion=excursion[1].titre||"";
+    updated.excursionDate=excursion[1].date||""; updated.prixUnitaire=parseMontant(excursion[1].prix);
+    for(const field of ["personnes","acompte","statut"]){const value=prompt("Modifier "+field+" :",record[field]==null?"":String(record[field]));if(value===null)return;updated[field]=value.trim();}
+    updated.personnes=Math.max(1,Number(updated.personnes)||1); updated.acompte=parseMontant(updated.acompte);
+  } else {
+    for(const field of (labels[kind]||[])){const value=prompt("Modifier "+field+" :",record[field]==null?"":String(record[field]));if(value===null)return;updated[field]=value.trim();}
+  }
+  updated.updatedAt=Date.now(); updated.updatedBy=currentUser?.uid||"";
+  try{await db.ref("rdn/"+kind+"/"+id).update(updated);}catch(e){alert("Modification impossible : "+e.message);}
+}
+async function editInvoiceRecord(id, invoice) {
+  const updated = { ...invoice };
+  const fields = ["client", "telephone", "adresse", "objet", "personnes", "montant", "acompte", "modePaiement", "echeance", "inclus", "note"];
+  for (const field of fields) {
+    const value = prompt("Modifier " + field + " :", invoice[field] == null ? "" : String(invoice[field]));
+    if (value === null) return;
+    updated[field] = value.trim();
+  }
+  updated.personnes = Number(updated.personnes);
+  updated.montant = Number(updated.montant);
+  updated.acompte = Number(updated.acompte);
+  if (!Number.isInteger(updated.personnes) || updated.personnes < 1 || !Number.isFinite(updated.montant) || updated.montant < 10000 || !Number.isFinite(updated.acompte) || updated.acompte < 10000 || updated.acompte > updated.montant) {
+    alert("Vérifiez l'effectif, le montant minimum de 10 000 Ar et l'acompte (10 000 Ar minimum, sans dépasser le total).");
+    return;
+  }
+  updated.solde = updated.montant - updated.acompte;
+  updated.updatedAt = Date.now();
+  updated.updatedBy = currentUser?.uid || "";
+  try { await db.ref("rdn/factures/" + id).update(updated); }
+  catch (error) { alert("Modification de la facture impossible : " + error.message); }
+}
+
+async function deleteRecord(kind,id,record) {
+  const label=record.nom||record.titre||record.client||record.libelle||record.numero||"cet élément";
+  if(!confirm("Confirmer la suppression de "+label+" ? Cette action est définitive."))return;
+  try{await db.ref("rdn/"+kind+"/"+id).remove();}catch(e){alert("Suppression impossible : "+e.message);}
+}
+function prepareInvoiceFromReservation(r) {
+  const client=dataCache.clients[r.clientId]||{}, excursion=dataCache.excursions[r.excursionId]||{}, form=$("invoiceForm"); if(!form)return;
+  form.elements.client.value=r.client||client.nom||"";
+  form.elements.telephone.value=r.clientTelephone||client.telephone||"";
+  form.elements.objet.value=r.excursion||excursion.titre||"";
+  form.elements.dateVoyage.value="";
+  form.elements.personnes.value=Math.max(1,Number(r.personnes)||1);
+  const amount=parseMontant(r.prixUnitaire||excursion.prix)*Math.max(1,Number(r.personnes)||1);
+  form.elements.montant.value=amount>=10000?amount:"";
+  form.elements.acompte.value=Math.max(10000,parseMontant(r.acompte));
+  form.dataset.reservationId=r.id||"";
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.dataset.page==="factures"));
+  document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden")); $("factures").classList.remove("hidden");
+  alert("Informations préremplies. Vérifiez la date du voyage, le montant et l'acompte avant de générer la facture.");
+}
+
 //                  FACTURES RDN
 // ==================================================
 
@@ -346,7 +379,19 @@ function renderInvoiceCard(host, id, o) {
   print.textContent = "Voir / PDF";
   print.onclick = () => printRdnInvoice(o);
 
-  actions.append(print);
+  const edit = document.createElement("button");
+  edit.type = "button";
+  edit.className = "record-edit";
+  edit.textContent = "Modifier";
+  edit.onclick = () => editInvoiceRecord(id, o);
+
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "record-delete";
+  remove.textContent = "Supprimer";
+  remove.onclick = () => deleteRecord("factures", id, o);
+
+  actions.append(print, edit, remove);
   card.append(main, actions);
   host.append(card);
 }
@@ -553,6 +598,9 @@ if (invoiceForm) {
     o.date = new Date().toLocaleDateString("fr-FR");
     o.createdAt = Date.now();
     o.type = "facture-acompte";
+    if (invoiceForm.dataset.reservationId) o.reservationId = invoiceForm.dataset.reservationId;
+    o.createdBy = currentUser?.uid || "";
+    o.createdByEmail = currentUser?.email || "";
 
     try {
       const invoicesRef = db.ref("rdn/factures");
@@ -585,6 +633,7 @@ if (invoiceForm) {
       }
 
       invoiceForm.reset();
+      delete invoiceForm.dataset.reservationId;
 
       invoiceForm.elements.personnes.value = 1;
       invoiceForm.elements.montant.value = "";
