@@ -759,7 +759,7 @@ body{
 }
 
 .contacts{
-  margin: 0 12px;
+  margin: 0 8px 0;
   padding:0;
   line-height:1.15;
 }
@@ -783,7 +783,7 @@ body{
 .stamp-block{
   position:absolute;
   right:0;
-  bottom:-1;
+  bottom:0;
   z-index:5;
   max-width:165px;
   margin:0;
