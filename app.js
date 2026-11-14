@@ -4,6 +4,7 @@ const $ = id => document.getElementById(id);
 let auth, db, currentUser = null;
 const dataCache = { clients:{}, excursions:{}, reservations:{}, factures:{}, depenses:{} };
 const dbListeners = {};
+const cacheReady = { clients: false, excursions: false, reservations: false, factures: false, depenses: false };
 let savingGenericForm = false;
 
 const kinds = [
@@ -61,7 +62,7 @@ function init() {
       updateInvoiceNumberPreview();
     } else {
       stopRealtimeSync();
-      kinds.forEach(kind => { dataCache[kind] = {}; renderKind(kind); });
+      kinds.forEach(kind => { dataCache[kind] = {}; cacheReady[kind] = false; renderKind(kind); });
       refreshStats();
     }
   });
@@ -114,12 +115,54 @@ document.querySelectorAll("form[data-kind]").forEach(f => {
     const obj = {};
     new FormData(f).forEach((v,k) => { obj[k]=v; });
     if (f.dataset.kind === "reservations") {
-      const client=dataCache.clients[obj.clientId], excursion=dataCache.excursions[obj.excursionId];
-      if (!client || !excursion) { alert("Veuillez sélectionner un client et une excursion valides."); return; }
-      obj.client=client.nom||""; obj.clientTelephone=client.telephone||"";
-      obj.excursion=excursion.titre||""; obj.excursionDate=excursion.date||"";
-      obj.prixUnitaire=parseMontant(excursion.prix); obj.clientId=String(obj.clientId); obj.excursionId=String(obj.excursionId);
-      obj.personnes=Math.max(1,Number(obj.personnes)||1); obj.acompte=parseMontant(obj.acompte);
+      if (!cacheReady.clients || !cacheReady.excursions) {
+        alert("Attendez le chargement des clients et des excursions, puis réessayez.");
+        return;
+      }
+      const nomSaisi = String(obj.clientNom || "").trim().replace(/\s+/g, " ");
+      const telephoneSaisi = String(obj.clientTelephone || "").trim();
+      const nomCle = nomSaisi.toLocaleLowerCase("fr");
+      const telCle = telephoneSaisi.replace(/\D/g, "");
+      if (!nomSaisi) { alert("Le nom du client est obligatoire."); return; }
+
+      const clients = Object.entries(dataCache.clients || {});
+      let clientEntry = telCle ? clients.find(([id,c]) => String(c.telephone||"").replace(/\D/g,"") === telCle) : null;
+      if (!clientEntry) clientEntry = clients.find(([id,c]) =>
+        String(c.nom||"").trim().replace(/\s+/g," ").toLocaleLowerCase("fr") === nomCle
+      );
+
+      let clientId, client;
+      if (clientEntry) {
+        [clientId, client] = clientEntry;
+        if (telephoneSaisi && !client.telephone) {
+          await db.ref("rdn/clients/" + clientId).update({
+            telephone: telephoneSaisi, updatedAt: Date.now(), updatedBy: currentUser.uid
+          });
+        }
+      } else {
+        const clientRef = db.ref("rdn/clients").push();
+        client = {
+          nom: nomSaisi, telephone: telephoneSaisi, email: "",
+          createdAt: Date.now(), createdBy: currentUser.uid,
+          createdByEmail: currentUser.email || "", origine: "reservation"
+        };
+        await clientRef.set(client);
+        clientId = clientRef.key;
+      }
+
+      const excursion = dataCache.excursions[obj.excursionId];
+      if (!excursion) { alert("Veuillez choisir une excursion valide."); return; }
+
+      obj.client = client.nom || nomSaisi;
+      obj.clientTelephone = telephoneSaisi || client.telephone || "";
+      obj.clientId = String(clientId);
+      obj.excursion = excursion.titre || "";
+      obj.excursionDate = excursion.date || "";
+      obj.prixUnitaire = parseMontant(excursion.prix);
+      obj.excursionId = String(obj.excursionId);
+      delete obj.clientNom;
+      obj.personnes = Math.max(1, Number(obj.personnes) || 1);
+      obj.acompte = parseMontant(obj.acompte);
     }
     obj.createdAt=Date.now(); obj.createdBy=currentUser.uid; obj.createdByEmail=currentUser.email||"";
     savingGenericForm=true;
@@ -141,8 +184,10 @@ function startRealtimeSync() {
     const ref=db.ref("rdn/"+kind);
     const callback=snapshot=>{
       dataCache[kind]=snapshot.val()||{};
+      cacheReady[kind] = true;
       renderKind(kind); refreshStats();
-      if(kind==="clients"||kind==="excursions") refreshReservationChoices();
+      if(kind==="clients") refreshClientSuggestions();
+      if(kind==="excursions") refreshReservationChoices();
       if(kind==="factures") updateInvoiceNumberPreview();
       const status=document.getElementById("syncStatus"); if(status) status.textContent="Synchronisation en temps réel";
     };
@@ -185,15 +230,34 @@ function refreshStats() {
 
 // ===== LIAISON CLIENTS / EXCURSIONS / RÉSERVATIONS =====
 function refreshReservationChoices() {
-  const form=document.querySelector('form[data-kind="reservations"]'); if(!form)return;
-  const cs=form.elements.clientId, es=form.elements.excursionId; if(!cs||!es)return;
-  const oldC=cs.value, oldE=es.value;
-  cs.innerHTML='<option value="">Choisir un client</option>';
-  Object.entries(dataCache.clients||{}).forEach(([id,c])=>{const op=document.createElement("option");op.value=id;op.textContent=c.nom||"Client sans nom";cs.append(op);});
-  es.innerHTML='<option value="">Choisir une excursion</option>';
-  Object.entries(dataCache.excursions||{}).forEach(([id,x])=>{const op=document.createElement("option");op.value=id;op.textContent=[x.titre||"Excursion",x.date||"",x.prix?parseMontant(x.prix).toLocaleString("fr-FR")+" Ar":""].filter(Boolean).join(" — ");es.append(op);});
-  if(oldC&&dataCache.clients[oldC])cs.value=oldC; if(oldE&&dataCache.excursions[oldE])es.value=oldE;
+  const form = document.querySelector('form[data-kind="reservations"]');
+  if (!form) return;
+  const select = form.elements.excursionId;
+  if (!select) return;
+  const previous = select.value;
+  select.innerHTML = '<option value="">Choisir une excursion</option>';
+  Object.entries(dataCache.excursions || {}).forEach(([id, x]) => {
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = [x.titre || "Excursion", x.date || "",
+      x.prix ? parseMontant(x.prix).toLocaleString("fr-FR") + " Ar" : ""
+    ].filter(Boolean).join(" — ");
+    select.append(option);
+  });
+  if (previous && dataCache.excursions[previous]) select.value = previous;
 }
+function refreshClientSuggestions() {
+  const list = document.getElementById("clientsSuggestions");
+  if (!list) return;
+  list.innerHTML = "";
+  Object.values(dataCache.clients || {}).forEach(client => {
+    const option = document.createElement("option");
+    option.value = client.nom || "";
+    if (client.telephone) option.label = client.telephone;
+    list.append(option);
+  });
+}
+
 async function editRecord(kind,id,record) {
   const updated={...record};
   if(kind==="reservations") {
