@@ -129,12 +129,24 @@ document.querySelectorAll("form[data-kind]").forEach(f => {
     if (savingGenericForm) return;
     const obj = {};
     new FormData(f).forEach((v,k) => { obj[k]=v; });
+    if (f.dataset.kind === "clients") {
+  obj.nom = capitaliserNom(obj.nom);
+}
+
+if (f.dataset.kind === "excursions") {
+  obj.titre = capitaliserNom(obj.titre);
+}
+    // 
+    
     if (f.dataset.kind === "reservations") {
       if (!cacheReady.clients || !cacheReady.excursions) {
         alert("Attendez le chargement des clients et des excursions, puis réessayez.");
         return;
       }
-      const nomSaisi = String(obj.clientNom || "").trim().replace(/\s+/g, " ");
+      //const nomSaisi = String(obj.clientNom || "").trim().replace(/\s+/g, " ");
+      const nomSaisi = capitaliserNom(obj.clientNom);
+
+      
       const telephoneSaisi = String(obj.clientTelephone || "").trim();
       const nomCle = nomSaisi.toLocaleLowerCase("fr");
       const telCle = telephoneSaisi.replace(/\D/g, "");
@@ -171,7 +183,10 @@ document.querySelectorAll("form[data-kind]").forEach(f => {
       obj.client = client.nom || nomSaisi;
       obj.clientTelephone = telephoneSaisi || client.telephone || "";
       obj.clientId = String(clientId);
-      obj.excursion = excursion.titre || "";
+     // obj.excursion = excursion.titre || "";
+      obj.excursion = capitaliserNom(excursion.titre || "");
+
+      
       obj.excursionDate = excursion.date || "";
       obj.prixUnitaire = parseMontant(excursion.prix);
       obj.excursionId = String(obj.excursionId);
