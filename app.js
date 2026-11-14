@@ -20,7 +20,7 @@ const labels = {
   excursions: ["titre", "date", "prix", "places"],
   reservations: ["client", "excursion", "personnes", "acompte", "statut"],
   factures: ["numero", "client", "objet", "montant"],
-  depenses: ["libelle", "categorie", "montant", "date"]
+  depenses: ["libelle", "categorie", "montant", "date", "typeDepense", "excursionId"]
 };
 
 // ===== CONFIGURATION FIREBASE =====
@@ -164,6 +164,28 @@ document.querySelectorAll("form[data-kind]").forEach(f => {
       obj.personnes = Math.max(1, Number(obj.personnes) || 1);
       obj.acompte = parseMontant(obj.acompte);
     }
+    if (f.dataset.kind === "depenses") {
+      if (!cacheReady.excursions) {
+        alert("Attendez le chargement des excursions, puis réessayez.");
+        return;
+      }
+      obj.typeDepense = obj.typeDepense === "voyage" ? "voyage" : "generale";
+      if (obj.typeDepense === "voyage") {
+        const excursion = dataCache.excursions[obj.excursionId];
+        if (!obj.excursionId || !excursion) {
+          alert("Veuillez choisir l'excursion concernée par cette dépense.");
+          return;
+        }
+        obj.excursionId = String(obj.excursionId);
+        obj.excursion = excursion.titre || "";
+        obj.excursionDate = excursion.date || "";
+      } else {
+        obj.excursionId = "";
+        obj.excursion = "";
+        obj.excursionDate = "";
+      }
+      obj.montant = parseMontant(obj.montant);
+    }
     obj.createdAt=Date.now(); obj.createdBy=currentUser.uid; obj.createdByEmail=currentUser.email||"";
     savingGenericForm=true;
     const submit=f.querySelector('button[type="submit"], button:not([type])'); if(submit) submit.disabled=true;
@@ -187,7 +209,8 @@ function startRealtimeSync() {
       cacheReady[kind] = true;
       renderKind(kind); refreshStats();
       if(kind==="clients") refreshClientSuggestions();
-      if(kind==="excursions") refreshReservationChoices();
+      if(kind==="excursions") { refreshReservationChoices(); refreshExpenseExcursionChoices(); }
+      if(kind==="reservations" || kind==="depenses" || kind==="excursions") renderTripBalances();
       if(kind==="factures") updateInvoiceNumberPreview();
       const status=document.getElementById("syncStatus"); if(status) status.textContent="Synchronisation en temps réel";
     };
@@ -209,6 +232,7 @@ function renderKind(kind) {
   host.innerHTML="";
   Object.entries(dataCache[kind]||{}).sort((a,b)=>(Number(b[1]?.createdAt)||0)-(Number(a[1]?.createdAt)||0)).forEach(([id,o])=>{
     if(kind==="factures"){renderInvoiceCard(host,id,o);return;}
+    if(kind==="depenses"){renderExpenseCard(host,id,o);return;}
     const div=document.createElement("div"); div.className="item";
     const main=(labels[kind]||[]).map(k=>o[k]!==undefined&&o[k]!==""?`${k}: ${o[k]}`:"").filter(Boolean).join(" • ");
     const left=document.createElement("span"); left.textContent=main||"(Sans détail)";
@@ -226,6 +250,92 @@ function refreshStats() {
   [["clients","nClients"],["excursions","nExcursions"],["reservations","nReservations"]].forEach(([k,id])=>{const el=$(id);if(el)el.textContent=Object.keys(dataCache[k]||{}).length;});
   const total=Object.values(dataCache.depenses||{}).reduce((sum,d)=>sum+parseMontant(d?.montant),0);
   const el=$("sumDepenses"); if(el)el.textContent=total.toLocaleString("fr-FR")+" Ar";
+  renderTripBalances();
+}
+
+// ===== DÉPENSES PAR VOYAGE / DÉPENSES GÉNÉRALES =====
+function refreshExpenseExcursionChoices() {
+  const form = document.querySelector('form[data-kind="depenses"]');
+  if (!form || !form.elements.excursionId) return;
+  const select = form.elements.excursionId;
+  const previous = select.value;
+  select.innerHTML = '<option value="">Choisir une excursion</option>';
+  Object.entries(dataCache.excursions || {}).forEach(([id, x]) => {
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = [x.titre || "Excursion", x.date || ""].filter(Boolean).join(" — ");
+    select.append(option);
+  });
+  if (previous && dataCache.excursions[previous]) select.value = previous;
+  toggleExpenseExcursionField();
+}
+function toggleExpenseExcursionField() {
+  const form = document.querySelector('form[data-kind="depenses"]');
+  if (!form) return;
+  const type = form.elements.typeDepense?.value || "generale";
+  const wrap = document.getElementById("expenseExcursionWrap");
+  const select = form.elements.excursionId;
+  if (wrap) wrap.classList.toggle("hidden", type !== "voyage");
+  if (select) select.required = type === "voyage";
+}
+function expenseMoney(value) { return parseMontant(value).toLocaleString("fr-FR") + " Ar"; }
+function renderExpenseCard(host, id, o) {
+  const div = document.createElement("div"); div.className = "item";
+  const legacy = !o.typeDepense;
+  const kind = legacy ? "Ancienne dépense (non classée)" : (o.typeDepense === "voyage" ? "Dépense par voyage" : "Dépense générale");
+  const trip = o.typeDepense === "voyage" ? (o.excursion || dataCache.excursions[o.excursionId]?.titre || "Excursion") : "";
+  const main = document.createElement("span");
+  main.textContent = `${o.libelle || "Dépense"} • ${expenseMoney(o.montant)} • ${kind}${trip ? " • " + trip : ""}${o.categorie ? " • " + o.categorie : ""}`;
+  const date = document.createElement("small"); date.textContent = o.date || new Date(Number(o.createdAt)||Date.now()).toLocaleDateString("fr-FR");
+  const actions = document.createElement("div"); actions.className = "record-actions";
+  const edit = document.createElement("button"); edit.type="button"; edit.className="record-edit"; edit.textContent="Modifier"; edit.onclick=()=>editExpenseRecord(id,o);
+  const del = document.createElement("button"); del.type="button"; del.className="record-delete"; del.textContent="Supprimer"; del.onclick=()=>deleteRecord("depenses",id,o);
+  actions.append(edit,del); div.append(main,date,actions); host.append(div);
+}
+async function editExpenseRecord(id, record) {
+  const updated = {...record};
+  for (const field of ["libelle","categorie","montant","date"]) {
+    const value = prompt("Modifier " + field + " :", record[field] == null ? "" : String(record[field]));
+    if (value === null) return;
+    updated[field] = value.trim();
+  }
+  const type = prompt("Type de dépense : générale ou voyage ?", record.typeDepense === "voyage" ? "voyage" : "generale");
+  if (type === null) return;
+  updated.typeDepense = type.trim().toLowerCase().startsWith("v") ? "voyage" : "generale";
+  if (updated.typeDepense === "voyage") {
+    const trips = Object.entries(dataCache.excursions || {});
+    if (!trips.length) { alert("Aucune excursion disponible."); return; }
+    const options = trips.map(([key,x],i)=>`${i+1}. ${x.titre||"Excursion"} ${x.date||""}`).join("\n");
+    const oldIndex = trips.findIndex(([key])=>key===record.excursionId);
+    const choice = prompt("Choisir le numéro de l'excursion :\n"+options, String(Math.max(1,oldIndex+1)));
+    if (choice === null) return;
+    const trip = trips[Number(choice)-1]; if (!trip) { alert("Choix d'excursion invalide."); return; }
+    updated.excursionId=trip[0]; updated.excursion=trip[1].titre||""; updated.excursionDate=trip[1].date||"";
+  } else { updated.excursionId=""; updated.excursion=""; updated.excursionDate=""; }
+  updated.montant = parseMontant(updated.montant);
+  updated.updatedAt=Date.now(); updated.updatedBy=currentUser?.uid||"";
+  try { await db.ref("rdn/depenses/"+id).update(updated); }
+  catch(e) { alert("Modification impossible : "+e.message); }
+}
+function renderTripBalances() {
+  const host = document.getElementById("tripBalances");
+  if (!host) return;
+  host.innerHTML = "";
+  Object.entries(dataCache.excursions || {}).forEach(([id, trip]) => {
+    const reservations = Object.values(dataCache.reservations || {}).filter(r => String(r.excursionId||"")===String(id) && String(r.statut||"").toLowerCase() !== "annulée" && String(r.statut||"").toLowerCase() !== "annulee");
+    const forecastRevenue = reservations.reduce((sum,r)=>sum + parseMontant(r.prixUnitaire || trip.prix) * Math.max(1,Number(r.personnes)||1),0);
+    const expenses = Object.values(dataCache.depenses || {}).filter(d=>d.typeDepense==="voyage" && String(d.excursionId||"")===String(id)).reduce((sum,d)=>sum+parseMontant(d.montant),0);
+    const profit = forecastRevenue - expenses;
+    const card=document.createElement("article"); card.className="trip-balance-card";
+    const title=document.createElement("h3"); title.textContent=trip.titre||"Excursion";
+    const date=document.createElement("small"); date.textContent=trip.date||"Date non définie";
+    const stats=document.createElement("div"); stats.className="trip-balance-stats";
+    [["Dépenses totales",expenses],["CA prévisionnel",forecastRevenue],["Bénéfice prévisionnel",profit]].forEach(([label,value])=>{
+      const item=document.createElement("div"); const name=document.createElement("small"); name.textContent=label; const amount=document.createElement("strong"); amount.textContent=expenseMoney(value); item.append(name,amount); stats.append(item);
+    });
+    const formula=document.createElement("p"); formula.className="form-hint"; formula.textContent=`CA calculé sur ${reservations.reduce((n,r)=>n+Math.max(1,Number(r.personnes)||1),0)} personne(s) réservée(s), hors réservations annulées.`;
+    card.append(title,date,stats,formula); host.append(card);
+  });
 }
 
 // ===== LIAISON CLIENTS / EXCURSIONS / RÉSERVATIONS =====
@@ -1076,5 +1186,9 @@ window.onload = () => setTimeout(() => window.print(), 600);
 }
 
 // ===== LANCEMENT =====
+
+const expenseTypeSelect = document.getElementById("typeDepense");
+if (expenseTypeSelect) expenseTypeSelect.addEventListener("change", toggleExpenseExcursionField);
+toggleExpenseExcursionField();
 
 init();
