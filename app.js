@@ -378,6 +378,7 @@ function formatDateRDN(value) {
 
 // ===== CONFIGURATION DES CHAMPS DATE =====
 
+
 function configurerDatesFactureRDN() {
   if (!invoiceForm) return;
 
@@ -386,40 +387,39 @@ function configurerDatesFactureRDN() {
 
   const minimum = dateAujourdhuiISO_RDN();
 
-  function preparerChamp(input, labelText, placeholderText, aideText) {
+  function preparerChamp(input, labelText, placeholderText) {
     if (!input) return;
 
     input.type = "date";
     input.required = true;
     input.min = minimum;
 
-    // Placeholder et texte d'aide
-    input.placeholder = placeholderText;
     input.setAttribute("aria-label", labelText);
-    input.title = aideText;
+    input.title = placeholderText;
 
     input.style.display = "block";
     input.style.width = "100%";
-    input.style.marginBottom = "12px";
+    input.style.padding = "12px";
+    input.style.marginTop = "6px";
+    input.style.marginBottom = "16px";
 
     const label = document.createElement("label");
     label.textContent = labelText;
     label.style.display = "block";
     label.style.fontWeight = "bold";
-    label.style.fontSize = "13px";
-    label.style.marginTop = "12px";
+    label.style.fontSize = "14px";
+    label.style.marginTop = "14px";
     label.style.marginBottom = "5px";
     label.style.color = "#244b35";
 
     input.insertAdjacentElement("beforebegin", label);
 
     const aide = document.createElement("small");
-    aide.textContent = placeholderText + " — " + aideText;
+    aide.textContent = placeholderText;
     aide.style.display = "block";
-    aide.style.marginTop = "-8px";
+    aide.style.color = "#777";
+    aide.style.marginTop = "-10px";
     aide.style.marginBottom = "12px";
-    aide.style.color = "#666";
-    aide.style.fontSize = "12px";
 
     input.insertAdjacentElement("afterend", aide);
   }
@@ -427,58 +427,16 @@ function configurerDatesFactureRDN() {
   preparerChamp(
     dateVoyageInput,
     "DATE DU VOYAGE",
-    "Safidio eto ny datin'ny dia",
-    "Daty hanaovana ny excursion."
+    "Safidio eto ny datin'ny dia."
   );
 
   preparerChamp(
     echeanceInput,
     "DATE D'ÉCHÉANCE",
-    "Safidio eto ny daty farany handoavana ny solde",
-    "Daty farany handoavana ny ambim-bola."
+    "Safidio eto ny daty farany handoavana ny solde."
   );
 }
 
-function verifierDateFactureRDN(input, label) {
-  if (!input || !input.value) {
-    alert(label + " obligatoire : veuillez choisir une date.");
-    if (input) input.focus();
-    return false;
-  }
-
-  const value = input.value;
-  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-
-  if (!match) {
-    alert(label + " invalide : veuillez choisir une date dans le calendrier.");
-    input.focus();
-    return false;
-  }
-
-  const annee = Number(match[1]);
-  const mois = Number(match[2]);
-  const jour = Number(match[3]);
-
-  const date = new Date(annee, mois - 1, jour);
-
-  if (
-    date.getFullYear() !== annee ||
-    date.getMonth() !== mois - 1 ||
-    date.getDate() !== jour
-  ) {
-    alert(label + " : cette date n'existe pas.");
-    input.focus();
-    return false;
-  }
-
-  if (value < dateAujourdhuiISO_RDN()) {
-    alert(label + " : une date déjà passée n'est pas autorisée.");
-    input.focus();
-    return false;
-  }
-
-  return true;
-}
 
 configurerDatesFactureRDN();
 
