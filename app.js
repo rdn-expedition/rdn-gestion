@@ -321,20 +321,74 @@ function renderTripBalances() {
   const host = document.getElementById("tripBalances");
   if (!host) return;
   host.innerHTML = "";
+
   Object.entries(dataCache.excursions || {}).forEach(([id, trip]) => {
-    const reservations = Object.values(dataCache.reservations || {}).filter(r => String(r.excursionId||"")===String(id) && String(r.statut||"").toLowerCase() !== "annulée" && String(r.statut||"").toLowerCase() !== "annulee");
-    const forecastRevenue = reservations.reduce((sum,r)=>sum + parseMontant(r.prixUnitaire || trip.prix) * Math.max(1,Number(r.personnes)||1),0);
-    const expenses = Object.values(dataCache.depenses || {}).filter(d=>d.typeDepense==="voyage" && String(d.excursionId||"")===String(id)).reduce((sum,d)=>sum+parseMontant(d.montant),0);
+    const reservations = Object.values(dataCache.reservations || {}).filter(r =>
+      String(r.excursionId || "") === String(id) &&
+      !["annulée", "annulee"].includes(String(r.statut || "").toLowerCase())
+    );
+    const forecastRevenue = reservations.reduce((sum, r) =>
+      sum + parseMontant(r.prixUnitaire || trip.prix) * Math.max(1, Number(r.personnes) || 1), 0
+    );
+
+    // Seules les dépenses explicitement rattachées à cette excursion entrent dans son bilan.
+    const tripExpenses = Object.entries(dataCache.depenses || {}).filter(([expenseId, d]) =>
+      d && d.typeDepense === "voyage" && String(d.excursionId || "") === String(id)
+    );
+    const expenses = tripExpenses.reduce((sum, [expenseId, d]) => sum + parseMontant(d.montant), 0);
     const profit = forecastRevenue - expenses;
-    const card=document.createElement("article"); card.className="trip-balance-card";
-    const title=document.createElement("h3"); title.textContent=trip.titre||"Excursion";
-    const date=document.createElement("small"); date.textContent=trip.date||"Date non définie";
-    const stats=document.createElement("div"); stats.className="trip-balance-stats";
-    [["Dépenses totales",expenses],["CA prévisionnel",forecastRevenue],["Bénéfice prévisionnel",profit]].forEach(([label,value])=>{
-      const item=document.createElement("div"); const name=document.createElement("small"); name.textContent=label; const amount=document.createElement("strong"); amount.textContent=expenseMoney(value); item.append(name,amount); stats.append(item);
+
+    const card = document.createElement("article");
+    card.className = "trip-balance-card";
+    const title = document.createElement("h3");
+    title.textContent = trip.titre || "Excursion";
+    const date = document.createElement("small");
+    date.textContent = trip.date || "Date non définie";
+
+    const stats = document.createElement("div");
+    stats.className = "trip-balance-stats";
+    [["Dépenses totales", expenses], ["CA prévisionnel", forecastRevenue], ["Bénéfice prévisionnel", profit]].forEach(([label, value]) => {
+      const item = document.createElement("div");
+      const name = document.createElement("small");
+      name.textContent = label;
+      const amount = document.createElement("strong");
+      amount.textContent = expenseMoney(value);
+      item.append(name, amount);
+      stats.append(item);
     });
-    const formula=document.createElement("p"); formula.className="form-hint"; formula.textContent=`CA calculé sur ${reservations.reduce((n,r)=>n+Math.max(1,Number(r.personnes)||1),0)} personne(s) réservée(s), hors réservations annulées.`;
-    card.append(title,date,stats,formula); host.append(card);
+
+    const expenseHeading = document.createElement("h4");
+    expenseHeading.className = "trip-expenses-heading";
+    expenseHeading.textContent = `Dépenses de cette excursion (${tripExpenses.length})`;
+    const expenseList = document.createElement("div");
+    expenseList.className = "trip-expenses-list";
+
+    if (tripExpenses.length) {
+      tripExpenses
+        .sort((a, b) => String(b[1].date || "").localeCompare(String(a[1].date || "")))
+        .forEach(([expenseId, d]) => {
+          const row = document.createElement("div");
+          row.className = "trip-expense-row";
+          const detail = document.createElement("span");
+          detail.textContent = [d.libelle || "Dépense", d.categorie || "", d.date || ""].filter(Boolean).join(" • ");
+          const amount = document.createElement("strong");
+          amount.textContent = expenseMoney(d.montant);
+          row.append(detail, amount);
+          expenseList.append(row);
+        });
+    } else {
+      const empty = document.createElement("p");
+      empty.className = "trip-expenses-empty";
+      empty.textContent = "Aucune dépense enregistrée pour cette excursion.";
+      expenseList.append(empty);
+    }
+
+    const formula = document.createElement("p");
+    formula.className = "form-hint";
+    formula.textContent = `CA calculé sur ${reservations.reduce((n, r) => n + Math.max(1, Number(r.personnes) || 1), 0)} personne(s) réservée(s), hors réservations annulées. Les dépenses générales ne sont pas incluses dans ce bilan.`;
+
+    card.append(title, date, stats, expenseHeading, expenseList, formula);
+    host.append(card);
   });
 }
 
