@@ -756,20 +756,20 @@ body{
 .bottom{
   display:grid;
   grid-template-columns:1fr 1fr;
-  gap:8px;
-  align-items:center;
-  margin:18px 8px 0;
-  min-height:165px
+  gap:4px;
+  align-items:start;
+  margin:3px 8px 0;
+  min-height:0
 }
 
 .contacts{
   font-size:13px;
-  line-height:2.1
+  line-height:1.3
 }
 
 .seal-sign{
   display:flex;
-  align-items:center;
+  align-items:flex-start;
   justify-content:flex-end
 }
 
@@ -777,13 +777,14 @@ body{
   display:flex;
   flex-direction:column;
   align-items:center;
-  justify-content:center;
-  max-width:190px
+  justify-content:flex-start;
+  max-width:165px;
+  transform:translateY(-12px)
 }
 
 .stamp{
-  width:165px;
-  height:165px;
+  width:145px;
+  height:145px;
   max-width:100%;
   object-fit:contain;
   display:block
@@ -792,9 +793,9 @@ body{
 .thanks{
   font-style:italic;
   color:#111;
-  margin:8px 9px 12px;
+  margin:0 9px 7px;
   font-size:13px;
-  line-height:1.5
+  line-height:1.35
 }
 
 .footer{
