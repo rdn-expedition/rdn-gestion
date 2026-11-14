@@ -2,3 +2,12 @@
 
 /* Factures : styles additionnels, sans modification des autres modules */
 .invoice-intro{color:#657269;margin:-6px 0 14px}.invoice-form{padding:18px}.invoice-form>*:not(.invoice-heading):not(.invoice-number-preview){flex:1 1 calc(50% - 8px);min-width:0}.invoice-form textarea{flex-basis:100%;font:inherit;padding:12px;border:1px solid #ccd6cc;border-radius:8px}.invoice-heading{flex:1 1 100%;font-weight:bold;color:#244b35;border-bottom:1px solid #e1e8e1;padding:8px 0}.invoice-number-preview{flex:1 1 100%;background:#edf5ef;padding:13px;border-radius:8px;color:#244b35}.invoice-save{flex:1 1 100%}.invoice-list-title{color:#244b35;margin-top:24px}.invoice-card{background:#fff;border:1px solid #e0e7df;border-radius:10px;padding:14px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.invoice-card-main{flex:1;min-width:180px}.invoice-card small{display:block;color:#68746a;margin-top:5px}.invoice-actions{display:flex;align-items:center;gap:8px}.invoice-actions button{padding:9px 12px}.invoice-status{display:inline-block;margin-top:7px;padding:4px 8px;border-radius:20px;background:#edf5ef;color:#24583a;font-size:12px;font-weight:bold}.invoice-status.pending{background:#fff3dc;color:#805a12}@media(max-width:600px){.invoice-form>*:not(.invoice-heading):not(.invoice-number-preview){flex-basis:100%}}
+
+/* Synchronisation et actions CRUD */
+.sync-status{display:block;margin-top:4px;font-size:11px;opacity:.85}
+.record-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.record-actions button,.record-invoice{width:auto;padding:7px 10px;margin:0;font-size:12px}
+.record-delete{background:#a83232!important;color:#fff!important}
+.record-edit{background:#315f46!important;color:#fff!important}
+.record-invoice{margin-top:8px;background:#176b9a!important;color:#fff!important}
+.item{display:block}.item>span,.item>small{display:block}
