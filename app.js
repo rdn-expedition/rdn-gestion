@@ -249,7 +249,30 @@ function renderKind(kind) {
     if(kind==="factures"){renderInvoiceCard(host,id,o);return;}
     if(kind==="depenses"){renderExpenseCard(host,id,o);return;}
     const div=document.createElement("div"); div.className="item";
-    const main=(labels[kind]||[]).map(k=>o[k]!==undefined&&o[k]!==""?`${k}: ${o[k]}`:"").filter(Boolean).join(" • ");
+    
+    //const main=(labels[kind]||[]).map(k=>o[k]!==undefined&&o[k]!==""?`${k}: ${o[k]}`:"").filter(Boolean).join(" • ");
+    const main = (labels[kind] || [])
+  .map(k => {
+    if (o[k] === undefined || o[k] === "") return "";
+
+    let valeur = o[k];
+
+    if (
+      (kind === "clients" && k === "nom") ||
+      (kind === "excursions" && k === "titre") ||
+      (kind === "reservations" && (k === "client" || k === "excursion"))
+    ) {
+      valeur = capitaliserNom(valeur);
+    }
+
+    return `${capitaliserLabel(k)}: ${valeur}`;
+  })
+  .filter(Boolean)
+  .join(" • ");
+
+    // farany 
+
+    
     const left=document.createElement("span"); left.textContent=main||"(Sans détail)";
     const right=document.createElement("small"); right.textContent=new Date(Number(o.createdAt)||Date.now()).toLocaleDateString("fr-FR");
     const actions=document.createElement("div"); actions.className="record-actions";
