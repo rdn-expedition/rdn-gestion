@@ -778,11 +778,13 @@ body{
 .seal-sign{
   position:relative;
   display:block;
+  min-height:110px;
 }
 
 .stamp-block{
   position:absolute;
   right:0;
+  bottom:15px;
   z-index:5;
   max-width:165px;
   margin:0;
