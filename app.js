@@ -12,7 +12,7 @@ const ADMIN_UIDS = [
   "lkT6cmjOrNcpn51LDycwJZQHUk32",
   "7FrzQ5hkT2Oaol8IkKev1MdRLTs1"
 ];
-const AGENT_EMAILS = ["rdnguide1@gmail.com"];
+const AGENT_EMAILS = ["guiderdn1@gmail.com"];
 let auditListener = null;
 let auditLogsCache = {};
 
