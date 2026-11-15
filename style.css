@@ -32,3 +32,7 @@
 .trip-expense-row span{min-width:0;overflow-wrap:anywhere;color:#526057}
 .trip-expense-row strong{white-space:nowrap;color:#244b35}
 .trip-expenses-empty{margin:0;padding:8px 0;border-top:1px solid #edf0ed;color:#758078;font-size:12px}
+
+.admin-only.hidden {
+  display: none !important;
+}
