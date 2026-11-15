@@ -63,6 +63,13 @@ function applyRoleAccess() {
     role.textContent = admin ? "Administrateur" : (isAgent() ? "Agent" : "Accès limité");
     role.classList.toggle("admin", admin);
   }
+
+  //
+  const adminTripBalanceSection = $("adminTripBalanceSection");
+
+if (adminTripBalanceSection) {
+  adminTripBalanceSection.classList.toggle("hidden", !isAdmin());
+}
 }
 
 function auditLabel(record = {}) {
