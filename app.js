@@ -1,4 +1,3 @@
-
 const $ = id => document.getElementById(id);
 
 let auth, db, currentUser = null;
@@ -6,6 +5,270 @@ const dataCache = { clients:{}, excursions:{}, reservations:{}, factures:{}, dep
 const dbListeners = {};
 const cacheReady = { clients: false, excursions: false, reservations: false, factures: false, depenses: false };
 let savingGenericForm = false;
+
+// ===== ADMINISTRATEUR ET JOURNAL D'AUDIT =====
+const ADMIN_EMAILS = ["rdnguide1@gmail.com"];
+let auditListener = null;
+let auditLogsCache = {};
+
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function isAdmin() {
+  return !!currentUser && ADMIN_EMAILS.includes(normalizeEmail(currentUser.email));
+}
+
+function auditLabel(record = {}) {
+  return String(record.nom || record.titre || record.client || record.libelle ||
+    record.numero || record.excursion || record.objet || "Élément").slice(0, 180);
+}
+
+function buildAuditEvent(action, module, recordId, record, details = "") {
+  return {
+    action,
+    module,
+    recordId: String(recordId || ""),
+    recordLabel: auditLabel(record),
+    details: String(details || "").slice(0, 300),
+    actorUid: currentUser?.uid || "",
+    actorEmail: normalizeEmail(currentUser?.email),
+    actorName: currentUser?.displayName || normalizeEmail(currentUser?.email) || "Utilisateur",
+    timestamp: Date.now()
+  };
+}
+
+async function writeAuditLog(action, module, recordId, record, details = "") {
+  if (!db || !currentUser) return;
+  const ref = db.ref("rdn/auditLogs").push();
+  await ref.set(buildAuditEvent(action, module, recordId, record, details));
+}
+
+async function auditSafely(action, module, recordId, record, details = "") {
+  try {
+    await writeAuditLog(action, module, recordId, record, details);
+  } catch (error) {
+    console.error("Journal d'audit indisponible :", error);
+    const status = document.getElementById("syncStatus");
+    if (status) status.textContent = "Données enregistrées — erreur du journal d'audit";
+  }
+}
+
+function ensureProDashboard() {
+  const dashboard = document.getElementById("dashboard");
+  if (!dashboard) return;
+
+  if (!document.getElementById("rdnProDashboard")) {
+    const host = document.createElement("div");
+    host.id = "rdnProDashboard";
+    host.innerHTML = `
+      <div class="rdn-dashboard-heading">
+        <div><span class="rdn-eyebrow">PILOTAGE DE L'ACTIVITÉ</span><h2>Vue d'ensemble</h2></div>
+        <span id="rdnRoleBadge" class="rdn-role-badge">Utilisateur</span>
+      </div>
+      <div class="rdn-kpi-grid">
+        <article class="rdn-kpi"><small>Chiffre d'affaires encaissé</small><strong id="rdnCaEncaisse">0 Ar</strong><span>Encaissements enregistrés</span></article>
+        <article class="rdn-kpi"><small>Chiffre d'affaires prévisionnel</small><strong id="rdnCaPrevisionnel">0 Ar</strong><span>Réservations actives + factures</span></article>
+        <article class="rdn-kpi"><small>Dépenses totales</small><strong id="rdnDepensesTotal">0 Ar</strong><span>Voyages et dépenses générales</span></article>
+        <article class="rdn-kpi"><small>Bénéfice prévisionnel</small><strong id="rdnBeneficePrevisionnel">0 Ar</strong><span>CA prévisionnel moins dépenses</span></article>
+        <article class="rdn-kpi"><small>Soldes clients à recevoir</small><strong id="rdnSoldesClients">0 Ar</strong><span>Factures non totalement réglées</span></article>
+        <article class="rdn-kpi"><small>Excursions à venir</small><strong id="rdnExcursionsAVenir">0</strong><span>Selon les dates renseignées</span></article>
+      </div>
+      <div class="rdn-dashboard-columns">
+        <section class="rdn-panel"><h3>Prochaines excursions</h3><div id="rdnUpcomingTrips" class="rdn-table-wrap"></div></section>
+        <section class="rdn-panel"><h3>Suivi des réservations</h3><div id="rdnReservationSummary"></div></section>
+      </div>
+      <section id="rdnAuditPanel" class="rdn-panel hidden">
+        <div class="rdn-audit-heading"><div><h3>Journal des actions</h3><p>Historique des créations, modifications et suppressions</p></div><span class="rdn-role-badge admin">ADMIN</span></div>
+        <div id="rdnAuditList"></div>
+      </section>
+      <p id="rdnDashboardUpdated" class="rdn-updated"></p>`;
+    const stats = dashboard.querySelector(".stats");
+    if (stats) stats.insertAdjacentElement("afterend", host);
+    else dashboard.append(host);
+  }
+
+  const auditPanel = document.getElementById("rdnAuditPanel");
+  if (auditPanel) auditPanel.classList.toggle("hidden", !isAdmin());
+  const role = document.getElementById("rdnRoleBadge");
+  if (role) {
+    role.textContent = isAdmin() ? "Administrateur" : "Utilisateur";
+    role.classList.toggle("admin", isAdmin());
+  }
+  renderProDashboard();
+}
+
+function formatAr(value) {
+  return (Number(value) || 0).toLocaleString("fr-FR") + " Ar";
+}
+
+function parseDateRDN(value) {
+  const text = String(value || "").trim();
+  let match = text.match(/^(\d{2})[\/.-](\d{2})[\/.-](\d{4})$/);
+  if (match) return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
+  match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function renderProDashboard() {
+  const host = document.getElementById("rdnProDashboard");
+  if (!host) return;
+
+  const reservationEntries = Object.entries(dataCache.reservations || {});
+  const reservations = reservationEntries.map(([id, record]) => ({ ...record, _key: id }));
+  const invoices = Object.values(dataCache.factures || {});
+  const expenses = Object.values(dataCache.depenses || {});
+  const invoicedReservationIds = new Set(invoices.map(i => String(i.reservationId || "")).filter(Boolean));
+
+  const activeReservations = reservations.filter(r =>
+    !["annulée", "annulee", "annulé", "annule"].includes(String(r.statut || "").trim().toLowerCase())
+  );
+  const reservationsNotInvoiced = activeReservations.filter(r => !invoicedReservationIds.has(String(r._key)));
+  const reservationForecast = reservationsNotInvoiced.reduce((sum, r) => {
+    const tripPrice = dataCache.excursions?.[r.excursionId]?.prix;
+    const unitPrice = parseMontant(r.prixUnitaire || tripPrice);
+    return sum + unitPrice * Math.max(1, Number(r.personnes) || 1);
+  }, 0);
+
+  const invoiceForecast = invoices.reduce((sum, i) => sum + parseMontant(i.montant), 0);
+  const caPrevisionnel = reservationForecast + invoiceForecast;
+  const invoicePaid = invoices.reduce((sum, i) => sum + parseMontant(i.acompte), 0);
+  const reservationPaid = reservationsNotInvoiced
+    .reduce((sum, r) => sum + parseMontant(r.acompte), 0);
+  const caEncaisse = invoicePaid + reservationPaid;
+  const depensesTotal = expenses.reduce((sum, d) => sum + parseMontant(d?.montant), 0);
+  const soldes = invoices.reduce((sum, i) => sum + Math.max(0, parseMontant(i.montant) - parseMontant(i.acompte)), 0);
+  const benefice = caPrevisionnel - depensesTotal;
+
+  const values = {
+    rdnCaEncaisse: caEncaisse,
+    rdnCaPrevisionnel: caPrevisionnel,
+    rdnDepensesTotal: depensesTotal,
+    rdnBeneficePrevisionnel: benefice,
+    rdnSoldesClients: soldes
+  };
+  Object.entries(values).forEach(([id, value]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = formatAr(value);
+  });
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const trips = Object.entries(dataCache.excursions || {}).map(([id, x]) => {
+    const date = parseDateRDN(x.date);
+    const booked = reservations.filter(r => String(r.excursionId || "") === String(id) &&
+      !["annulée", "annulee", "annulé", "annule"].includes(String(r.statut || "").trim().toLowerCase()))
+      .reduce((n, r) => n + Math.max(1, Number(r.personnes) || 1), 0);
+    return { id, title: x.titre || "Excursion", dateText: x.date || "Date non définie",
+      date, booked, capacity: Math.max(0, Number(x.places) || 0) };
+  }).filter(x => x.date && x.date >= today).sort((a, b) => a.date - b.date);
+
+  const upcomingCount = document.getElementById("rdnExcursionsAVenir");
+  if (upcomingCount) upcomingCount.textContent = String(trips.length);
+  const upcoming = document.getElementById("rdnUpcomingTrips");
+  if (upcoming) {
+    upcoming.innerHTML = trips.length ? trips.slice(0, 6).map(t => `
+      <div class="rdn-trip-row">
+        <div><strong>${escapeHTML(t.title)}</strong><small>${escapeHTML(t.dateText)}</small></div>
+        <span>${t.booked} ${t.capacity ? "/ " + t.capacity : ""} pers.</span>
+      </div>`).join("") : '<p class="rdn-empty">Aucune excursion future avec une date reconnue.</p>';
+  }
+
+  const summary = document.getElementById("rdnReservationSummary");
+  if (summary) {
+    const pending = activeReservations.filter(r => /attente/i.test(String(r.statut || ""))).length;
+    const confirmed = activeReservations.filter(r => /confirm/i.test(String(r.statut || ""))).length;
+    const cancelled = reservations.length - activeReservations.length;
+    summary.innerHTML = `
+      <div class="rdn-summary-row"><span>Réservations actives</span><strong>${activeReservations.length}</strong></div>
+      <div class="rdn-summary-row"><span>Confirmées</span><strong>${confirmed}</strong></div>
+      <div class="rdn-summary-row"><span>En attente</span><strong>${pending}</strong></div>
+      <div class="rdn-summary-row"><span>Annulées</span><strong>${cancelled}</strong></div>`;
+  }
+
+  const updated = document.getElementById("rdnDashboardUpdated");
+  if (updated) updated.textContent = "Mis à jour : " + new Date().toLocaleString("fr-FR");
+}
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[ch]));
+}
+
+function startAuditSync() {
+  if (!db || !currentUser || !isAdmin() || auditListener) return;
+  const ref = db.ref("rdn/auditLogs").limitToLast(100);
+  const callback = snapshot => {
+    auditLogsCache = snapshot.val() || {};
+    renderAuditLogs();
+  };
+  ref.on("value", callback, error => {
+    console.error("Lecture du journal d'audit impossible :", error);
+    const list = document.getElementById("rdnAuditList");
+    if (list) list.innerHTML = '<p class="rdn-empty">Accès au journal refusé. Vérifiez les règles Firebase.</p>';
+  });
+  auditListener = { ref, callback };
+}
+
+function stopAuditSync() {
+  if (auditListener) auditListener.ref.off("value", auditListener.callback);
+  auditListener = null;
+  auditLogsCache = {};
+}
+
+function renderAuditLogs() {
+  const list = document.getElementById("rdnAuditList");
+  if (!list || !isAdmin()) return;
+  const entries = Object.entries(auditLogsCache || {}).sort((a, b) =>
+    (Number(b[1]?.timestamp) || 0) - (Number(a[1]?.timestamp) || 0)
+  ).slice(0, 50);
+  list.innerHTML = entries.length ? entries.map(([id, item]) => {
+    const date = item.timestamp ? new Date(item.timestamp).toLocaleString("fr-FR") : "Date inconnue";
+    const actions = { create: "Création", update: "Modification", delete: "Suppression" };
+    return `<div class="rdn-audit-row">
+      <div><strong>${escapeHTML(actions[item.action] || item.action || "Action")}</strong>
+      <span>${escapeHTML(item.module || "—")} · ${escapeHTML(item.recordLabel || "Élément")}</span>
+      <small>${escapeHTML(item.actorEmail || item.actorName || "Utilisateur")} · ${escapeHTML(date)}</small></div>
+    </div>`;
+  }).join("") : '<p class="rdn-empty">Aucune action enregistrée pour le moment.</p>';
+}
+
+function injectProDashboardStyles() {
+  if (document.getElementById("rdnProDashboardStyles")) return;
+  const style = document.createElement("style");
+  style.id = "rdnProDashboardStyles";
+  style.textContent = `
+    #rdnProDashboard{margin-top:22px}
+    .rdn-dashboard-heading,.rdn-audit-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:18px 0 12px}
+    .rdn-dashboard-heading h2{margin:4px 0;color:#244b35;font-size:22px}
+    .rdn-eyebrow{font-size:10px;letter-spacing:1.5px;font-weight:800;color:#758879}
+    .rdn-role-badge{padding:7px 11px;border-radius:30px;background:#edf1ed;color:#526257;font-size:11px;font-weight:800}
+    .rdn-role-badge.admin{background:#e4f2e8;color:#1f6840}
+    .rdn-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:12px}
+    .rdn-kpi,.rdn-panel{background:#fff;border:1px solid #e0e7df;border-radius:13px;padding:17px;box-shadow:0 3px 12px rgba(31,59,39,.04)}
+    .rdn-kpi small{display:block;color:#68766c;font-size:12px;min-height:30px}
+    .rdn-kpi strong{display:block;color:#244b35;font-size:clamp(19px,2.5vw,25px);margin:8px 0;overflow-wrap:anywhere}
+    .rdn-kpi span{font-size:11px;color:#89938b}
+    .rdn-dashboard-columns{display:grid;grid-template-columns:1.2fr 1fr;gap:14px;margin-top:14px}
+    .rdn-panel{margin-top:14px}
+    .rdn-panel h3{margin:0 0 13px;color:#244b35;font-size:16px}
+    .rdn-trip-row,.rdn-summary-row,.rdn-audit-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;border-top:1px solid #edf0ed}
+    .rdn-trip-row:first-child,.rdn-summary-row:first-child,.rdn-audit-row:first-child{border-top:0}
+    .rdn-trip-row strong,.rdn-audit-row strong{display:block;font-size:13px;color:#293b2e}
+        .rdn-trip-row small,.rdn-audit-row small{display:block;margin-top:4px;color:#7a867d;font-size:11px}
+    .rdn-trip-row>span,.rdn-summary-row strong{font-size:12px;font-weight:800;color:#315d40;white-space:nowrap}
+    .rdn-audit-heading p{margin:4px 0 0;color:#778279;font-size:12px}
+    .rdn-audit-row{justify-content:flex-start}
+    .rdn-audit-row span{display:block;margin-top:4px;color:#58665c;font-size:12px}
+    .rdn-empty,.rdn-updated{font-size:12px;color:#818c83}
+    .rdn-updated{text-align:right;margin:12px 2px}
+    @media(max-width:680px){.rdn-dashboard-columns{grid-template-columns:1fr}.rdn-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rdn-kpi{padding:13px}.rdn-kpi strong{font-size:17px}}
+    @media(max-width:380px){.rdn-kpi-grid{grid-template-columns:1fr}}
+  `;
+  document.head.append(style);
+}
 
 const kinds = [
   "clients",
@@ -73,11 +336,16 @@ function init() {
     $("app").classList.toggle("hidden", !u);
 
     if (u) {
+      injectProDashboardStyles();
+      ensureProDashboard();
       startRealtimeSync();
+      startAuditSync();
       updateInvoiceNumberPreview();
     } else {
       stopRealtimeSync();
+      stopAuditSync();
       kinds.forEach(kind => { dataCache[kind] = {}; cacheReady[kind] = false; renderKind(kind); });
+      ensureProDashboard();
       refreshStats();
     }
   });
@@ -137,7 +405,7 @@ if (f.dataset.kind === "excursions") {
   obj.titre = capitaliserNom(obj.titre);
 }
     // 
-    
+
     if (f.dataset.kind === "reservations") {
       if (!cacheReady.clients || !cacheReady.excursions) {
         alert("Attendez le chargement des clients et des excursions, puis réessayez.");
@@ -146,7 +414,7 @@ if (f.dataset.kind === "excursions") {
       //const nomSaisi = String(obj.clientNom || "").trim().replace(/\s+/g, " ");
       const nomSaisi = capitaliserNom(obj.clientNom);
 
-      
+
       const telephoneSaisi = String(obj.clientTelephone || "").trim();
       const nomCle = nomSaisi.toLocaleLowerCase("fr");
       const telCle = telephoneSaisi.replace(/\D/g, "");
@@ -186,7 +454,7 @@ if (f.dataset.kind === "excursions") {
      // obj.excursion = excursion.titre || "";
       obj.excursion = capitaliserNom(excursion.titre || "");
 
-      
+
       obj.excursionDate = excursion.date || "";
       obj.prixUnitaire = parseMontant(excursion.prix);
       obj.excursionId = String(obj.excursionId);
@@ -220,7 +488,10 @@ if (f.dataset.kind === "excursions") {
     savingGenericForm=true;
     const submit=f.querySelector('button[type="submit"], button:not([type])'); if(submit) submit.disabled=true;
     try {
-      await db.ref("rdn/"+f.dataset.kind).push(obj); f.reset();
+      const newRef = db.ref("rdn/"+f.dataset.kind).push();
+      await newRef.set(obj);
+      await auditSafely("create", f.dataset.kind, newRef.key, obj, "Nouvel enregistrement");
+      f.reset();
       if(f.dataset.kind==="reservations" && f.elements.personnes) f.elements.personnes.value=1;
       alert("Enregistrement effectué avec succès !");
     } catch(err) { alert("Erreur d'enregistrement : "+err.message); }
@@ -264,7 +535,7 @@ function renderKind(kind) {
     if(kind==="factures"){renderInvoiceCard(host,id,o);return;}
     if(kind==="depenses"){renderExpenseCard(host,id,o);return;}
     const div=document.createElement("div"); div.className="item";
-    
+
     //const main=(labels[kind]||[]).map(k=>o[k]!==undefined&&o[k]!==""?`${k}: ${o[k]}`:"").filter(Boolean).join(" • ");
     const main = (labels[kind] || [])
   .map(k => {
@@ -287,7 +558,7 @@ function renderKind(kind) {
 
     // farany 
 
-    
+
     const left=document.createElement("span"); left.textContent=main||"(Sans détail)";
     const right=document.createElement("small"); right.textContent=new Date(Number(o.createdAt)||Date.now()).toLocaleDateString("fr-FR");
     const actions=document.createElement("div"); actions.className="record-actions";
@@ -304,6 +575,7 @@ function refreshStats() {
   const total=Object.values(dataCache.depenses||{}).reduce((sum,d)=>sum+parseMontant(d?.montant),0);
   const el=$("sumDepenses"); if(el)el.textContent=total.toLocaleString("fr-FR")+" Ar";
   renderTripBalances();
+  renderProDashboard();
 }
 
 // ===== DÉPENSES PAR VOYAGE / DÉPENSES GÉNÉRALES =====
@@ -367,8 +639,10 @@ async function editExpenseRecord(id, record) {
   } else { updated.excursionId=""; updated.excursion=""; updated.excursionDate=""; }
   updated.montant = parseMontant(updated.montant);
   updated.updatedAt=Date.now(); updated.updatedBy=currentUser?.uid||"";
-  try { await db.ref("rdn/depenses/"+id).update(updated); }
-  catch(e) { alert("Modification impossible : "+e.message); }
+  try {
+    await db.ref("rdn/depenses/"+id).update(updated);
+    await auditSafely("update", "depenses", id, updated, "Dépense modifiée");
+  } catch(e) { alert("Modification impossible : "+e.message); }
 }
 function renderTripBalances() {
   const host = document.getElementById("tripBalances");
@@ -498,7 +772,10 @@ async function editRecord(kind,id,record) {
     for(const field of (labels[kind]||[])){const value=prompt("Modifier "+field+" :",record[field]==null?"":String(record[field]));if(value===null)return;updated[field]=value.trim();}
   }
   updated.updatedAt=Date.now(); updated.updatedBy=currentUser?.uid||"";
-  try{await db.ref("rdn/"+kind+"/"+id).update(updated);}catch(e){alert("Modification impossible : "+e.message);}
+  try {
+    await db.ref("rdn/"+kind+"/"+id).update(updated);
+    await auditSafely("update", kind, id, updated, "Enregistrement modifié");
+  } catch(e) { alert("Modification impossible : "+e.message); }
 }
 async function editInvoiceRecord(id, invoice) {
   const updated = { ...invoice };
@@ -518,14 +795,27 @@ async function editInvoiceRecord(id, invoice) {
   updated.solde = updated.montant - updated.acompte;
   updated.updatedAt = Date.now();
   updated.updatedBy = currentUser?.uid || "";
-  try { await db.ref("rdn/factures/" + id).update(updated); }
-  catch (error) { alert("Modification de la facture impossible : " + error.message); }
+  try {
+    await db.ref("rdn/factures/" + id).update(updated);
+        await auditSafely("update", "factures", id, updated, "Facture modifiée");
+  } catch (error) { alert("Modification de la facture impossible : " + error.message); }
 }
 
 async function deleteRecord(kind,id,record) {
-  const label=record.nom||record.titre||record.client||record.libelle||record.numero||"cet élément";
-  if(!confirm("Confirmer la suppression de "+label+" ? Cette action est définitive."))return;
-  try{await db.ref("rdn/"+kind+"/"+id).remove();}catch(e){alert("Suppression impossible : "+e.message);}
+  const label = auditLabel(record);
+  if (!confirm("Confirmer la suppression de " + label + " ? Cette action est définitive.")) return;
+  if (!currentUser || !db) { alert("Veuillez vous connecter avant de supprimer."); return; }
+  try {
+    // Suppression et journalisation dans une seule mise à jour atomique Firebase.
+    const logRef = db.ref("rdn/auditLogs").push();
+    const updates = {};
+    updates["rdn/" + kind + "/" + id] = null;
+    updates["rdn/auditLogs/" + logRef.key] =
+      buildAuditEvent("delete", kind, id, record, "Suppression effectuée");
+    await db.ref().update(updates);
+  } catch(e) {
+    alert("Suppression impossible : " + e.message);
+  }
 }
 function prepareInvoiceFromReservation(r) {
   const client=dataCache.clients[r.clientId]||{}, excursion=dataCache.excursions[r.excursionId]||{}, form=$("invoiceForm"); if(!form)return;
@@ -807,7 +1097,6 @@ function configurerDatesFactureRDN() {
 configurerDatesFactureRDN();
 
 // ===== ENREGISTREMENT FACTURE =====
-
 if (invoiceForm) {
   invoiceForm.addEventListener("submit", async event => {
     event.preventDefault();
@@ -913,6 +1202,7 @@ if (invoiceForm) {
         throw new Error("Le numéro de facture n'a pas été attribué.");
       }
 
+      await auditSafely("create", "factures", newRef.key, o, "Facture créée : " + (o.numero || ""));
       invoiceForm.reset();
       delete invoiceForm.dataset.reservationId;
 
